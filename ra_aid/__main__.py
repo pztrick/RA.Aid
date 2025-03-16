@@ -425,6 +425,11 @@ Examples:
         action="store_true",
         help="Force disable reasoning assistance regardless of model defaults",
     )
+    parser.add_argument(
+        "--custom-tools",
+        type=str,
+        help="Python module path containing custom tools (e.g. backend.custom_tools)",
+    )
     if args is None:
         args = sys.argv[1:]
     parsed_args = parser.parse_args(args)
@@ -845,6 +850,7 @@ def main():
                     config_repo.set("show_cost", args.show_cost)
                     config_repo.set("force_reasoning_assistance", args.reasoning_assistance)
                     config_repo.set("disable_reasoning_assistance", args.no_reasoning_assistance)
+                    config_repo.set("custom_tools", args.custom_tools)
 
                     # Set modification tools based on use_aider flag
                     set_modification_tools(args.use_aider)
