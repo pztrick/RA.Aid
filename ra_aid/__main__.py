@@ -78,7 +78,7 @@ from ra_aid.models_params import DEFAULT_TEMPERATURE, models_params
 from ra_aid.project_info import format_project_info, get_project_info
 from ra_aid.prompts.chat_prompts import CHAT_PROMPT
 from ra_aid.prompts.web_research_prompts import WEB_RESEARCH_PROMPT_SECTION_CHAT
-from ra_aid.tool_configs import get_chat_tools, set_modification_tools
+from ra_aid.tool_configs import get_chat_tools, set_modification_tools, get_custom_tools
 from ra_aid.tools.human import ask_human
 
 logger = get_logger(__name__)
@@ -742,6 +742,10 @@ def main():
                 config_repo.set(
                     "disable_reasoning_assistance", args.no_reasoning_assistance
                 )
+                config_repo.set("custom_tools", args.custom_tools)
+
+                # Validate custom tools function signatures
+                get_custom_tools()
 
                 # Build status panel with memory statistics
                 status = build_status()
@@ -850,7 +854,6 @@ def main():
                     config_repo.set("show_cost", args.show_cost)
                     config_repo.set("force_reasoning_assistance", args.reasoning_assistance)
                     config_repo.set("disable_reasoning_assistance", args.no_reasoning_assistance)
-                    config_repo.set("custom_tools", args.custom_tools)
 
                     # Set modification tools based on use_aider flag
                     set_modification_tools(args.use_aider)

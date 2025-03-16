@@ -3,7 +3,6 @@ import sys
 from typing import List, Optional
 
 from langchain_core.tools import BaseTool
-from ra_aid.logging_config import get_logger
 from ra_aid.tools import (
     ask_expert,
     ask_human,
@@ -67,7 +66,6 @@ def get_custom_tools() -> List[BaseTool]:
     Returns:
         List[BaseTool]: List of custom tools, or empty list if no custom tools configured
     """
-    logger = get_logger(__name__)
     
     try:
         config = get_config_repository().get_all()
@@ -82,8 +80,7 @@ def get_custom_tools() -> List[BaseTool]:
         # Import the module
         spec = importlib.util.spec_from_file_location(custom_tools_path, module_path)
         if not spec or not spec.loader:
-            logger.error(f"Could not load custom tools module: {custom_tools_path}")
-            return []
+            raise Exception(f"Could not load custom tools module: {custom_tools_path}")
             
         module = importlib.util.module_from_spec(spec)
         sys.modules[custom_tools_path] = module
@@ -91,53 +88,19 @@ def get_custom_tools() -> List[BaseTool]:
         
         # Get the tools list
         if not hasattr(module, "tools"):
-            logger.error(f"Custom tools module {custom_tools_path} does not export 'tools' attribute")
-            return []
+            raise Exception(f"Custom tools module {custom_tools_path} does not export 'tools' attribute")
             
         tools = module.tools
         if not isinstance(tools, list):
-            logger.error(f"Custom tools module {custom_tools_path} 'tools' attribute must be a list")
-            return []
-
-        # Validate each tool's return type signature
-        for tool in tools:
-            if not isinstance(tool, BaseTool):
-                logger.error(f"Custom tool {tool} is not a BaseTool instance")
-                return []
-                
-            # Get the return type annotation
-            import inspect
-            sig = inspect.signature(tool.func)
-            return_annotation = sig.return_annotation
-            
-            # Check if return type is Dict with required keys
-            from typing import get_type_hints, Dict
-            type_hints = get_type_hints(tool.func)
-            return_type = type_hints.get('return')
-            
-            if not (return_type and hasattr(return_type, "__origin__") and return_type.__origin__ is dict):
-                logger.error(f"Custom tool {tool.name} must return a Dict")
-                return []
-                
-            required_keys = {'success': bool, 'retriable': bool, 'return_code': int, 'output': str}
-            
-            # Get the dict's key/value types
-            if hasattr(return_type, "__args__"):
-                key_type, val_type = return_type.__args__
-                if key_type is not str:
-                    logger.error(f"Custom tool {tool.name} dict keys must be strings")
-                    return []
-            
-            logger.debug(f"Validated return type for custom tool {tool.name}")
+            raise Exception(f"Custom tools module {custom_tools_path} 'tools' attribute must be a list")
                 
         # Log which tools were loaded
         tool_names = [tool.name for tool in tools]
-        logger.info(f"Loaded custom tools: {', '.join(tool_names)} from {custom_tools_path}")
+        print(f"Loaded custom tools: {', '.join(tool_names)} from {custom_tools_path}")
         return tools
-        
+
     except Exception as e:
-        logger.error(f"Error loading custom tools: {str(e)}")
-        return []
+        raise
 
 
 # Read-only tools that don't modify system state
@@ -156,7 +119,7 @@ def get_read_only_tools(
     Returns:
         List of tool functions
     """
-    tools = get_custom_tools() + [
+    tools = [
         emit_key_snippet,
         # Only include emit_related_files if use_aider is True
         *([emit_related_files] if use_aider else []),
@@ -171,6 +134,8 @@ def get_read_only_tools(
         ripgrep_search,
         run_shell_command,  # can modify files, but we still need it for read-only tasks.
     ]
+
+    tools.extend(get_custom_tools())
 
     if web_research_enabled:
         tools.append(request_web_research)
@@ -190,6 +155,7 @@ def get_all_tools() -> list[BaseTool]:
     all_tools.extend(RESEARCH_TOOLS)
     all_tools.extend(get_web_research_tools())
     all_tools.extend(get_chat_tools())
+    all_tools.extend(get_custom_tools())
     return all_tools
 
 
@@ -201,11 +167,9 @@ try:
 except (ImportError, RuntimeError):
     pass
 
-READ_ONLY_TOOLS = get_read_only_tools(use_aider=_config.get("use_aider", False))
 
 # MODIFICATION_TOOLS will be set dynamically based on config, default defined here
 MODIFICATION_TOOLS = [file_str_replace, put_complete_file_contents]
-COMMON_TOOLS = get_read_only_tools(use_aider=_config.get("use_aider", False))
 EXPERT_TOOLS = [emit_expert_context, ask_expert]
 RESEARCH_TOOLS = [
     emit_research_notes,
