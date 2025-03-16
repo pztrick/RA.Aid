@@ -3,6 +3,7 @@ import sys
 from typing import List, Optional
 
 from langchain_core.tools import BaseTool
+from ra_aid.console.output import cpm
 from ra_aid.tools import (
     ask_expert,
     ask_human,
@@ -96,7 +97,7 @@ def get_custom_tools() -> List[BaseTool]:
                 
         # Log which tools were loaded
         tool_names = [tool.name for tool in tools]
-        print(f"Loaded custom tools: {', '.join(tool_names)} from {custom_tools_path}")
+        cpm(f"Loaded custom tools: {', '.join(tool_names)} from {custom_tools_path}")
         return tools
 
     except Exception as e:

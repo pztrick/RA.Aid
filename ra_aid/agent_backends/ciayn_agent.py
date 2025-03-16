@@ -456,7 +456,16 @@ class CiaynAgent:
                 return "Tool execution interrupted: agent_should_exit flag is set."
 
             # Execute the tool
+            tool_name = self.extract_tool_name(code)
+            cpm(f"About to execute tool: {tool_name}")
+            cpm(f"Tool globals available: {list(globals_dict.keys())}")
+            
+            # Check if this is a custom tool
+            if tool_name not in [t.func.__name__ for t in self.tools]:
+                raise RuntimeError(f"Tool {tool_name} not found in registered tools!")
+                
             result = eval(code.strip(), globals_dict)
+            cpm(f"Tool {tool_name} executed successfully")
             return result
         except Exception as e:
             error_msg = f"Error: {str(e)} \n Could not execute code: {code}"
