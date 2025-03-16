@@ -49,6 +49,97 @@ def set_modification_tools(use_aider=False):
         MODIFICATION_TOOLS.extend([file_str_replace, put_complete_file_contents])
 
 
+def get_custom_tools() -> List[BaseTool]:
+    """Dynamically import and return custom tools from the configured module.
+    
+    The custom tools module must export a 'tools' attribute that is a list of
+    langchain Tool objects (e.g. StructuredTool or other tool classes).
+    
+    Tools must return a Dict with keys:
+    - success: bool
+    - retriable: bool  
+    - return_code: int
+    - output: str
+    
+    If retriable=True, the tool may be retried with the previous output appended
+    to the prompt, up to max_retries times.
+    
+    Returns:
+        List[BaseTool]: List of custom tools, or empty list if no custom tools configured
+    """
+    logger = get_logger(__name__)
+    
+    try:
+        config = get_config_repository().get_all()
+        custom_tools_path = config.get("custom_tools")
+        
+        if not custom_tools_path:
+            return []
+            
+        # Convert module path to system path
+        module_path = custom_tools_path.replace(".", "/") + ".py"
+        
+        # Import the module
+        spec = importlib.util.spec_from_file_location(custom_tools_path, module_path)
+        if not spec or not spec.loader:
+            logger.error(f"Could not load custom tools module: {custom_tools_path}")
+            return []
+            
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[custom_tools_path] = module
+        spec.loader.exec_module(module)
+        
+        # Get the tools list
+        if not hasattr(module, "tools"):
+            logger.error(f"Custom tools module {custom_tools_path} does not export 'tools' attribute")
+            return []
+            
+        tools = module.tools
+        if not isinstance(tools, list):
+            logger.error(f"Custom tools module {custom_tools_path} 'tools' attribute must be a list")
+            return []
+
+        # Validate each tool's return type signature
+        for tool in tools:
+            if not isinstance(tool, BaseTool):
+                logger.error(f"Custom tool {tool} is not a BaseTool instance")
+                return []
+                
+            # Get the return type annotation
+            import inspect
+            sig = inspect.signature(tool.func)
+            return_annotation = sig.return_annotation
+            
+            # Check if return type is Dict with required keys
+            from typing import get_type_hints, Dict
+            type_hints = get_type_hints(tool.func)
+            return_type = type_hints.get('return')
+            
+            if not (return_type and hasattr(return_type, "__origin__") and return_type.__origin__ is dict):
+                logger.error(f"Custom tool {tool.name} must return a Dict")
+                return []
+                
+            required_keys = {'success': bool, 'retriable': bool, 'return_code': int, 'output': str}
+            
+            # Get the dict's key/value types
+            if hasattr(return_type, "__args__"):
+                key_type, val_type = return_type.__args__
+                if key_type is not str:
+                    logger.error(f"Custom tool {tool.name} dict keys must be strings")
+                    return []
+            
+            logger.debug(f"Validated return type for custom tool {tool.name}")
+                
+        # Log which tools were loaded
+        tool_names = [tool.name for tool in tools]
+        logger.info(f"Loaded custom tools: {', '.join(tool_names)} from {custom_tools_path}")
+        return tools
+        
+    except Exception as e:
+        logger.error(f"Error loading custom tools: {str(e)}")
+        return []
+
+
 # Read-only tools that don't modify system state
 def get_read_only_tools(
     human_interaction: bool = False,
@@ -256,60 +347,6 @@ def get_web_research_tools(expert_enabled: bool = True):
         tools.append(ask_expert)
 
     return tools
-
-
-def get_custom_tools() -> List[BaseTool]:
-    """Dynamically import and return custom tools from the configured module.
-    
-    The custom tools module must export a 'tools' attribute that is a list of
-    langchain Tool objects (e.g. StructuredTool or other tool classes).
-    
-    Returns:
-        List[BaseTool]: List of custom tools, or empty list if no custom tools configured
-    """
-    logger = get_logger(__name__)
-    
-    try:
-        config = get_config_repository().get_all()
-        custom_tools_path = config.get("custom_tools")
-        
-        if not custom_tools_path:
-            return []
-            
-        # Convert module path to system path
-        module_path = custom_tools_path.replace(".", "/") + ".py"
-        
-        # Import the module
-        spec = importlib.util.spec_from_file_location(custom_tools_path, module_path)
-        if not spec or not spec.loader:
-            logger.error(f"Could not load custom tools module: {custom_tools_path}")
-            return []
-            
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[custom_tools_path] = module
-        spec.loader.exec_module(module)
-        
-        # Get the tools list
-        if not hasattr(module, "tools"):
-            logger.error(f"Custom tools module {custom_tools_path} does not export 'tools' attribute")
-            return []
-            
-        tools = module.tools
-        if not isinstance(tools, list):
-            logger.error(f"Custom tools module {custom_tools_path} 'tools' attribute must be a list")
-            return []
-            
-        for tool in tools:
-            if not isinstance(tool, BaseTool):
-                logger.error(f"Custom tool {tool} is not a BaseTool instance")
-                return []
-                
-        logger.info(f"Loaded {len(tools)} custom tools from {custom_tools_path}")
-        return tools
-        
-    except Exception as e:
-        logger.error(f"Error loading custom tools: {str(e)}")
-        return []
 
 
 def get_chat_tools(expert_enabled: bool = True, web_research_enabled: bool = False):
