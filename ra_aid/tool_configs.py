@@ -1,5 +1,9 @@
-from langchain_core.tools import BaseTool
+import importlib.util
+import sys
+from typing import List, Optional
 
+from langchain_core.tools import BaseTool
+from ra_aid.logging_config import get_logger
 from ra_aid.tools import (
     ask_expert,
     ask_human,
@@ -61,7 +65,7 @@ def get_read_only_tools(
     Returns:
         List of tool functions
     """
-    tools = [
+    tools = get_custom_tools() + [
         emit_key_snippet,
         # Only include emit_related_files if use_aider is True
         *([emit_related_files] if use_aider else []),
@@ -252,6 +256,60 @@ def get_web_research_tools(expert_enabled: bool = True):
         tools.append(ask_expert)
 
     return tools
+
+
+def get_custom_tools() -> List[BaseTool]:
+    """Dynamically import and return custom tools from the configured module.
+    
+    The custom tools module must export a 'tools' attribute that is a list of
+    langchain Tool objects (e.g. StructuredTool or other tool classes).
+    
+    Returns:
+        List[BaseTool]: List of custom tools, or empty list if no custom tools configured
+    """
+    logger = get_logger(__name__)
+    
+    try:
+        config = get_config_repository().get_all()
+        custom_tools_path = config.get("custom_tools")
+        
+        if not custom_tools_path:
+            return []
+            
+        # Convert module path to system path
+        module_path = custom_tools_path.replace(".", "/") + ".py"
+        
+        # Import the module
+        spec = importlib.util.spec_from_file_location(custom_tools_path, module_path)
+        if not spec or not spec.loader:
+            logger.error(f"Could not load custom tools module: {custom_tools_path}")
+            return []
+            
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[custom_tools_path] = module
+        spec.loader.exec_module(module)
+        
+        # Get the tools list
+        if not hasattr(module, "tools"):
+            logger.error(f"Custom tools module {custom_tools_path} does not export 'tools' attribute")
+            return []
+            
+        tools = module.tools
+        if not isinstance(tools, list):
+            logger.error(f"Custom tools module {custom_tools_path} 'tools' attribute must be a list")
+            return []
+            
+        for tool in tools:
+            if not isinstance(tool, BaseTool):
+                logger.error(f"Custom tool {tool} is not a BaseTool instance")
+                return []
+                
+        logger.info(f"Loaded {len(tools)} custom tools from {custom_tools_path}")
+        return tools
+        
+    except Exception as e:
+        logger.error(f"Error loading custom tools: {str(e)}")
+        return []
 
 
 def get_chat_tools(expert_enabled: bool = True, web_research_enabled: bool = False):
