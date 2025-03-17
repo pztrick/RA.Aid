@@ -3,7 +3,9 @@ import sys
 from typing import List, Optional
 
 from langchain_core.tools import BaseTool
-from ra_aid.console.output import cpm
+from ra_aid.console.output import console, cpm
+from rich.markdown import Markdown
+from rich.panel import Panel
 from ra_aid.tools import (
     ask_expert,
     ask_human,
@@ -57,16 +59,21 @@ def get_custom_tools() -> List[BaseTool]:
     
     Tools must return a Dict with keys:
     - success: bool
-    - retriable: bool  
+    - can_retry: bool  
     - return_code: int
     - output: str
     
-    If retriable=True, the tool may be retried with the previous output appended
+    If can_retry=True, the tool may be retried with the previous output appended
     to the prompt, up to max_retries times.
     
     Returns:
         List[BaseTool]: List of custom tools, or empty list if no custom tools configured
     """
+    global CUSTOM_TOOLS
+
+    if CUSTOM_TOOLS:
+        # Custom tools were previously loaded
+        return CUSTOM_TOOLS
     
     try:
         config = get_config_repository().get_all()
@@ -95,9 +102,17 @@ def get_custom_tools() -> List[BaseTool]:
         if not isinstance(tools, list):
             raise Exception(f"Custom tools module {custom_tools_path} 'tools' attribute must be a list")
                 
-        # Log which tools were loaded
-        tool_names = [tool.name for tool in tools]
-        cpm(f"Loaded custom tools: {', '.join(tool_names)} from {custom_tools_path}")
+        # Log which tools were loaded (only during startup)
+        if len(tools) > 0:
+            custom_tool_output = f"""These custom tools are available to the agent:\n"""
+            for tool in tools:
+                custom_tool_output += f"* {tool.name}: {tool.description}\n"
+            console.print(Panel(Markdown(custom_tool_output.strip()), title="⚙️ Custom Tools Available", border_style="magenta"))
+
+        # Set global
+        CUSTOM_TOOLS.clear()
+        CUSTOM_TOOLS.extend(tools)
+
         return tools
 
     except Exception as e:
@@ -171,6 +186,8 @@ except (ImportError, RuntimeError):
 
 # MODIFICATION_TOOLS will be set dynamically based on config, default defined here
 MODIFICATION_TOOLS = [file_str_replace, put_complete_file_contents]
+# CUSTOM TOOLS will be set dynamically based on config, default defined here
+CUSTOM_TOOLS = []
 EXPERT_TOOLS = [emit_expert_context, ask_expert]
 RESEARCH_TOOLS = [
     emit_research_notes,

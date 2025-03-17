@@ -17,8 +17,9 @@ from ra_aid.models_params import DEFAULT_TOKEN_LIMIT, models_params
 from ra_aid.prompts.ciayn_prompts import CIAYN_AGENT_SYSTEM_PROMPT, CIAYN_AGENT_HUMAN_PROMPT, EXTRACT_TOOL_CALL_PROMPT, NO_TOOL_CALL_PROMPT
 from ra_aid.tools.expert import get_model
 from ra_aid.tools.reflection import get_function_info
-from ra_aid.console.output import cpm
+from ra_aid.tool_configs import CUSTOM_TOOLS
 from ra_aid.console.formatting import print_warning, print_error, console
+from ra_aid.console.output import cpm
 from ra_aid.agent_context import should_exit
 from ra_aid.text.processing import extract_think_tag, process_thinking_content
 from rich.panel import Panel
@@ -455,17 +456,21 @@ class CiaynAgent:
                 logger.debug("Agent should exit flag detected before tool execution")
                 return "Tool execution interrupted: agent_should_exit flag is set."
 
-            # Execute the tool
+            # Retrieve tool name
             tool_name = self.extract_tool_name(code)
-            cpm(f"About to execute tool: {tool_name}")
-            cpm(f"Tool globals available: {list(globals_dict.keys())}")
-            
-            # Check if this is a custom tool
-            if tool_name not in [t.func.__name__ for t in self.tools]:
-                raise RuntimeError(f"Tool {tool_name} not found in registered tools!")
-                
+
+            # Check if this is a custom tool and print output
+            is_custom_tool = tool_name in [tool.name for tool in CUSTOM_TOOLS]
+
+            # Execute tool
             result = eval(code.strip(), globals_dict)
-            cpm(f"Tool {tool_name} executed successfully")
+
+            # Only display console output for custom tools
+            if is_custom_tool:
+                custom_tool_output = f"Executing custom tool: {tool_name}\n"
+                custom_tool_output += f"\n\tResult: {result}"
+                console.print(Panel(Markdown(custom_tool_output.strip()), title="⚙️ Custom Tool", border_style="magenta"))
+
             return result
         except Exception as e:
             error_msg = f"Error: {str(e)} \n Could not execute code: {code}"
