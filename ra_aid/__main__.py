@@ -318,7 +318,7 @@ Examples:
         help="Only perform research without implementation",
     )
     parser.add_argument(
-        "--research-and-plan-only",
+        "--research-and-plan-only", "-rap",
         action="store_true",
         help="Run research and planning, then exit.",
     )
