@@ -95,6 +95,19 @@ def run_planning_agent(
         web_research_enabled=get_config_repository().get("web_research_enabled", False),
     )
 
+
+def _get_research_only_note() -> str:
+    """
+    Determines the note to be included in the prompt based on research-related flags.
+    """
+    config_repo = get_config_repository()
+    if config_repo.get("research_and_plan_only", False):
+        return "Note: The --research-and-plan-only flag is active. Your sole responsibility is to create a comprehensive and detailed implementation plan. You must use the emit_plan tool to output the final plan. No other actions will be taken."
+    elif config_repo.get("research_only", False):
+        return " Only request implementation if the user explicitly asked for changes to be made."
+    return ""
+
+
     # Get model configuration
     provider = get_config_repository().get("expert_provider", "")
     model_name = get_config_repository().get("expert_model", "")
@@ -350,11 +363,7 @@ def run_planning_agent(
         key_facts=key_facts,
         key_snippets=key_snippets,
         work_log=get_work_log_repository().format_work_log(),
-        research_only_note=(
-            ""
-            if get_config_repository().get("research_only", False)
-            else " Only request implementation if the user explicitly asked for changes to be made."
-        ),
+        research_only_note=_get_research_only_note(),
         env_inv=env_inv,
         expert_guidance_section=expert_guidance_section,
     )

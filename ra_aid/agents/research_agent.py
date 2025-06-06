@@ -385,15 +385,20 @@ YOU MUST FOLLOW THE EXPERT'S GUIDANCE OR ELSE BE TERMINATED!
 
     # Get environment inventory information
 
+    # Determine the research note based on the mode
+    research_and_plan_only = get_config_repository().get("research_and_plan_only", False)
+    if research_and_plan_only:
+        research_only_note = "Note: The --research-and-plan-only flag is active. Your goal is to conduct thorough research and produce comprehensive research notes. Another agent will use these notes to create a plan, but no code implementation will be performed."
+    elif research_only:
+        research_only_note = ""
+    else:
+        research_only_note = " Only request implementation if the user explicitly asked for changes to be made."
+
     prompt = (RESEARCH_ONLY_PROMPT if research_only else RESEARCH_PROMPT).format(
         current_date=current_date,
         working_directory=working_directory,
         base_task=base_task,
-        research_only_note=(
-            ""
-            if research_only
-            else " Only request implementation if the user explicitly asked for changes to be made."
-        ),
+        research_only_note=research_only_note,
         expert_section=expert_section,
         human_section=human_section,
         web_research_section=web_research_section,
