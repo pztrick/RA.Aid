@@ -18,10 +18,12 @@ from ra_aid.database.repositories.key_fact_repository import get_key_fact_reposi
 from ra_aid.database.repositories.key_snippet_repository import get_key_snippet_repository
 from ra_aid.database.repositories.human_input_repository import get_human_input_repository
 from ra_aid.database.repositories.research_note_repository import get_research_note_repository
+from ra_aid.database.repositories.session_repository import get_session_repository
 from ra_aid.database.repositories.trajectory_repository import get_trajectory_repository
 from ra_aid.database.repositories.work_log_repository import get_work_log_repository
 from ra_aid.model_formatters import key_snippets_formatter
 from ra_aid.logging_config import get_logger
+from ra_aid.database.repositories.related_files_repository import get_related_files_repository
 
 logger = get_logger(__name__)
 
@@ -36,11 +38,57 @@ class SnippetInfo(TypedDict):
 
 console = Console()
 
-# Import repositories using the get_* functions
-from ra_aid.database.repositories.key_fact_repository import get_key_fact_repository
 
-# Import the related files repository
-from ra_aid.database.repositories.related_files_repository import get_related_files_repository
+@tool("emit_plan")
+def emit_plan(plan: str) -> str:
+    """
+    Stores the implementation plan for the current session.
+
+    This tool should be called by the planning agent to save the generated plan
+    to the database for later reference and execution.
+
+    Args:
+        plan: The implementation plan in markdown format.
+
+    Returns:
+        A confirmation message indicating the plan was stored.
+    """
+    try:
+        session_repo = get_session_repository()
+        session_record = session_repo.get_current_session_record()
+
+        if session_record:
+            session_record.plan = plan
+            session_record.save()
+
+            log_work_event("Stored implementation plan.")
+
+            # Record to trajectory
+            try:
+                human_input_id = get_human_input_repository().get_most_recent_id()
+                get_trajectory_repository().create(
+                    tool_name="emit_plan",
+                    tool_parameters={"plan": plan},
+                    step_data={
+                        "display_title": "Plan Stored",
+                        "plan_length": len(plan),
+                    },
+                    record_type="emit_plan",
+                    human_input_id=human_input_id,
+                )
+            except RuntimeError as e:
+                logger.warning(f"Failed to record trajectory for emit_plan: {str(e)}")
+
+            cpm(plan, title="📝 Plan Stored")
+            return "Plan stored successfully."
+        else:
+            logger.error("No active session found to store the plan.")
+            return "Error: No active session found."
+
+    except Exception as e:
+        logger.error(f"Failed to store plan: {str(e)}")
+        console.print(f"Error storing plan: {str(e)}", style="red")
+        return f"Failed to store plan: {str(e)}"
 
 
 @tool("emit_research_notes")
@@ -562,7 +610,6 @@ def log_work_event(event: str) -> str:
     except RuntimeError as e:
         logger.error(f"Failed to access work log repository: {str(e)}")
         return f"Failed to log event: {str(e)}"
-
 
 
 

@@ -318,6 +318,16 @@ Examples:
         help="Only perform research without implementation",
     )
     parser.add_argument(
+        "--research-and-plan-only",
+        action="store_true",
+        help="Run research and planning, then exit.",
+    )
+    parser.add_argument(
+        "--research-plan-only",
+        action="store_true",
+        help="Alias for --research-and-plan-only.",
+    )
+    parser.add_argument(
         "--provider",
         type=str,
         default=(
@@ -948,6 +958,7 @@ def main():
 
                 # Update config repo with values from CLI arguments
                 store_limit_config(config_repo, args)
+                config_repo.set("research_and_plan_only", args.research_and_plan_only or args.research_plan_only)
                 config_repo.update(config)
                 config_repo.set("provider", args.provider)
                 config_repo.set("model", args.model)
@@ -1295,6 +1306,23 @@ def main():
                     hil=args.hil,
                     memory=research_memory,
                 )
+
+                if args.research_and_plan_only or args.research_plan_only:
+                    from ra_aid.agents.planning_agent import run_planning_agent
+                    planning_provider = args.planner_provider or args.provider
+                    planning_model_name = args.planner_model or args.model
+                    planning_model = initialize_llm(
+                        planning_provider, planning_model_name, temperature=args.temperature
+                    )
+                    run_planning_agent(
+                        base_task,
+                        planning_model,
+                        expert_enabled=expert_enabled,
+                        hil=args.hil,
+                        memory=planning_memory,
+                    )
+                    print_stage_header("Research and planning complete. Notes and plan saved.")
+                    sys.exit(0)
 
                 # for how long have we had a second planning agent triggered here?
 

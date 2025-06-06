@@ -32,11 +32,12 @@ from ra_aid.tools.agent import (
     request_task_implementation,
     request_web_research,
 )
-from ra_aid.tools.memory import plan_implementation_completed
+from ra_aid.tools.memory import emit_plan, plan_implementation_completed
 from ra_aid.database.repositories.config_repository import get_config_repository
 
 # Define constant tool groups
 CUSTOM_TOOLS = []
+
 
 def set_modification_tools(use_aider=False):
     """Set the MODIFICATION_TOOLS list based on configuration.
@@ -100,7 +101,8 @@ def get_custom_tools() -> List[BaseTool]:
                 
         # Log which tools were loaded (only during startup)
         if len(tools) > 0:
-            custom_tool_output = f"""These custom tools are available to the agent:\n"""
+            custom_tool_output = f"""These custom tools are available to the agent:
+"""
             for tool in tools:
                 custom_tool_output += f"* {tool.name}: {tool.description}\n"
             console.print(Panel(Markdown(custom_tool_output.strip()), title="🛠️ Custom Tools Available", border_style="magenta"))
@@ -242,7 +244,8 @@ def get_research_tools(
 
 
 def get_planning_tools(
-    expert_enabled: bool = True, web_research_enabled: bool = False
+    expert_enabled: bool = True,
+    web_research_enabled: bool = False,
 ) -> list:
     """Get the list of planning tools based on whether expert is enabled.
 
@@ -250,6 +253,10 @@ def get_planning_tools(
         expert_enabled: Whether to include expert tools
         web_research_enabled: Whether to include web research tools
     """
+    research_and_plan_only = get_config_repository().get("research_and_plan_only", False)
+    if research_and_plan_only:
+        return [emit_plan]
+
     # Get config for use_aider value
     use_aider = False
     try:
@@ -266,8 +273,7 @@ def get_planning_tools(
     planning_tools = [
         request_task_implementation,
         plan_implementation_completed,
-        # *TEMPORARILY* disabled to improve tool calling perf.
-        # emit_plan,
+        emit_plan,
     ]
     tools.extend(planning_tools)
 

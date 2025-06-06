@@ -252,6 +252,29 @@ class ResearchNoteRepository:
         except peewee.DatabaseError as e:
             logger.error(f"Failed to fetch all research notes: {str(e)}")
             raise
+
+    def get_notes_by_session(self, session_id: int) -> List[ResearchNoteModel]:
+        """
+        Retrieve all research notes for a given session ID.
+        Args:
+            session_id: The ID of the session to retrieve notes for
+        Returns:
+            List[ResearchNoteModel]: A list of research notes for the session
+        Raises:
+            peewee.DatabaseError: If there's an error accessing the database
+        """
+        try:
+            notes = list(
+                ResearchNote.select()
+                .where(ResearchNote.session_id == session_id)
+                .order_by(ResearchNote.id)
+            )
+            return [self._to_model(note) for note in notes]
+        except peewee.DatabaseError as e:
+            logger.error(
+                f"Failed to fetch research notes for session {session_id}: {str(e)}"
+            )
+            raise
     
     def get_notes_dict(self) -> Dict[int, str]:
         """

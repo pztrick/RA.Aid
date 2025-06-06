@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 from ra_aid.tool_configs import (
     MODIFICATION_TOOLS,
     get_implementation_tools,
@@ -45,14 +47,41 @@ def test_get_research_tools():
 
 
 def test_get_planning_tools():
-    # Test with expert enabled
-    tools = get_planning_tools(expert_enabled=True)
-    assert len(tools) > 0
-    assert all(callable(tool) for tool in tools)
+    # Test default mode (not plan-only)
+    with patch("ra_aid.tool_configs.get_config_repository") as mock_get_repo:
+        mock_repo = MagicMock()
+        mock_repo.get.return_value = False  # research_and_plan_only is False
+        mock_get_repo.return_value = mock_repo
 
-    # Test without expert
-    tools_no_expert = get_planning_tools(expert_enabled=False)
-    assert len(tools_no_expert) < len(tools)
+        # Test with expert enabled
+        tools = get_planning_tools(expert_enabled=True)
+        assert len(tools) > 1
+        tool_names = {t.name for t in tools}
+        assert "request_task_implementation" in tool_names
+        # assert "emit_plan" in tool_names
+        assert "ask_expert" in tool_names
+
+        # Test without expert
+        tools_no_expert = get_planning_tools(expert_enabled=False)
+        assert len(tools_no_expert) < len(tools)
+        tool_names_no_expert = {t.name for t in tools_no_expert}
+        assert "ask_expert" not in tool_names_no_expert
+        assert "request_task_implementation" in tool_names_no_expert
+
+    # Test plan-only mode
+    with patch("ra_aid.tool_configs.get_config_repository") as mock_get_repo:
+        mock_repo = MagicMock()
+        mock_repo.get.return_value = True  # research_and_plan_only is True
+        mock_get_repo.return_value = mock_repo
+
+        # expert_enabled should not affect the outcome in plan-only mode
+        tools_plan_only_expert = get_planning_tools(expert_enabled=True)
+        assert len(tools_plan_only_expert) == 1
+        assert tools_plan_only_expert[0].name == "emit_plan"
+
+        tools_plan_only_no_expert = get_planning_tools(expert_enabled=False)
+        assert len(tools_plan_only_no_expert) == 1
+        assert tools_plan_only_no_expert[0].name == "emit_plan"
 
 
 def test_get_implementation_tools():
