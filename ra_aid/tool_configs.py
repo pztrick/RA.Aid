@@ -56,19 +56,19 @@ def set_modification_tools(use_aider=False):
 
 def get_custom_tools() -> List[BaseTool]:
     """Dynamically import and return custom tools from the configured module.
-    
+
     The custom tools module must export a 'tools' attribute that is a list of
     langchain Tool objects (e.g. StructuredTool or other tool classes).
-    
+
     Tools must return a Dict with keys:
     - success: bool
-    - can_retry: bool  
+    - can_retry: bool
     - return_code: int
     - output: str
-    
+
     If can_retry=True, the tool may be retried with the previous output appended
     to the prompt, up to max_retries times.
-    
+
     Returns:
         List[BaseTool]: List of custom tools, or empty list if no custom tools configured
     """
@@ -77,35 +77,45 @@ def get_custom_tools() -> List[BaseTool]:
     if CUSTOM_TOOLS:
         # Custom tools were previously loaded
         return CUSTOM_TOOLS
-    
+
     try:
-        custom_tools_path = get_config_repository().get("custom_tools", False)        
+        custom_tools_path = get_config_repository().get("custom_tools", False)
         if not custom_tools_path:
             return []
-            
+
         # Import the module directly using the provided path
         spec = importlib.util.spec_from_file_location("custom_tools", custom_tools_path)
         if not spec or not spec.loader:
             raise Exception(f"Could not load custom tools module: {custom_tools_path}")
-            
+
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        
+
         # Get the tools list
         if not hasattr(module, "tools"):
-            raise Exception(f"Custom tools module {custom_tools_path} does not export 'tools' attribute")
-            
+            raise Exception(
+                f"Custom tools module {custom_tools_path} does not export 'tools' attribute"
+            )
+
         tools = module.tools
         if not isinstance(tools, list):
-            raise Exception(f"Custom tools module {custom_tools_path} 'tools' attribute must be a list")
-                
+            raise Exception(
+                f"Custom tools module {custom_tools_path} 'tools' attribute must be a list"
+            )
+
         # Log which tools were loaded (only during startup)
         if len(tools) > 0:
             custom_tool_output = f"""These custom tools are available to the agent:
 """
             for tool in tools:
                 custom_tool_output += f"* {tool.name}: {tool.description}\n"
-            console.print(Panel(Markdown(custom_tool_output.strip()), title="🛠️ Custom Tools Available", border_style="magenta"))
+            console.print(
+                Panel(
+                    Markdown(custom_tool_output.strip()),
+                    title="🛠️ Custom Tools Available",
+                    border_style="magenta",
+                )
+            )
 
         # Set global
         CUSTOM_TOOLS.clear()
@@ -145,7 +155,7 @@ def get_read_only_tools(
         # list_directory_tree,
         # fuzzy_find_project_files,
         read_file_tool,
-            run_shell_command,  # can modify files, but we still need it for read-only tasks.
+        run_shell_command,  # can modify files, but we still need it for read-only tasks.
     ]
 
     if web_research_enabled:
@@ -217,6 +227,8 @@ def get_research_tools(
     except (ImportError, RuntimeError):
         pass
 
+    research_and_plan_only = get_config_repository().get("research_and_plan_only", False)
+
     # Start with read-only tools
     tools = get_read_only_tools(
         human_interaction, web_research_enabled, use_aider=use_aider
@@ -225,7 +237,7 @@ def get_research_tools(
     tools.extend(RESEARCH_TOOLS)
 
     # Add modification tools if not research_only
-    if not research_only:
+    if not research_only and not research_and_plan_only:
         # For now, we ONLY do modifications after planning.
         # tools.extend(MODIFICATION_TOOLS)
         tools.append(request_implementation)
@@ -253,7 +265,9 @@ def get_planning_tools(
         expert_enabled: Whether to include expert tools
         web_research_enabled: Whether to include web research tools
     """
-    research_and_plan_only = get_config_repository().get("research_and_plan_only", False)
+    research_and_plan_only = get_config_repository().get(
+        "research_and_plan_only", False
+    )
     if research_and_plan_only:
         return [emit_plan]
 
@@ -273,7 +287,7 @@ def get_planning_tools(
     planning_tools = [
         request_task_implementation,
         plan_implementation_completed,
-        emit_plan,
+        # emit_plan,
     ]
     tools.extend(planning_tools)
 

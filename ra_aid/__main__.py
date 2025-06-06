@@ -1240,6 +1240,10 @@ def main():
                 # Store config in repository
                 config_repo.update(config)
 
+                # Display message if research and plan only mode is enabled
+                if args.research_and_plan_only or args.research_plan_only:
+                    cpm("Research and plan only mode enabled. The agent will exit after planning.")
+
                 # Store base provider/model configuration
                 config_repo.set("provider", args.provider)
                 config_repo.set("model", args.model)

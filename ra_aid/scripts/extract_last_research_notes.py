@@ -25,6 +25,8 @@ def main():
                 print("No sessions found.", file=sys.stderr)
                 return
 
+            print(f"INFO: Found latest session with ID: {latest_session.id}", file=sys.stderr)
+
             with ResearchNoteRepositoryManager(db) as research_note_repo:
                 notes = research_note_repo.get_notes_by_session(latest_session.id)
                 if notes:

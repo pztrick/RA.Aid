@@ -136,7 +136,9 @@ class ResearchNoteRepository:
         
         return ResearchNoteModel.model_validate(note, from_attributes=True)
     
-    def create(self, content: str, human_input_id: Optional[int] = None) -> ResearchNoteModel:
+    def create(
+        self, content: str, human_input_id: Optional[int] = None, session_id: Optional[int] = None
+    ) -> ResearchNoteModel:
         """
         Create a new research note in the database.
         
@@ -151,7 +153,9 @@ class ResearchNoteRepository:
             peewee.DatabaseError: If there's an error creating the note
         """
         try:
-            note = ResearchNote.create(content=content, human_input_id=human_input_id)
+            note = ResearchNote.create(
+                content=content, human_input_id=human_input_id, session_id=session_id
+            )
             logger.debug(f"Created research note ID {note.id}: {content[:50]}...")
             return self._to_model(note)
         except peewee.DatabaseError as e:

@@ -21,6 +21,7 @@ from ra_aid.database.repositories.research_note_repository import get_research_n
 from ra_aid.database.repositories.session_repository import get_session_repository
 from ra_aid.database.repositories.trajectory_repository import get_trajectory_repository
 from ra_aid.database.repositories.work_log_repository import get_work_log_repository
+from ra_aid.database.repositories.config_repository import get_config_repository
 from ra_aid.model_formatters import key_snippets_formatter
 from ra_aid.logging_config import get_logger
 from ra_aid.database.repositories.related_files_repository import get_related_files_repository
@@ -80,6 +81,12 @@ def emit_plan(plan: str) -> str:
                 logger.warning(f"Failed to record trajectory for emit_plan: {str(e)}")
 
             cpm(plan, title="📝 Plan Stored")
+            
+            # Check if we should exit after planning
+            config_repo = get_config_repository()
+            if config_repo.get("research_and_plan_only", False):
+                mark_should_exit(propagation_depth=1)
+                
             return "Plan stored successfully."
         else:
             logger.error("No active session found to store the plan.")
@@ -110,9 +117,21 @@ def emit_research_notes(notes: str) -> str:
     except Exception as e:
         logger.warning(f"Failed to get recent human input: {str(e)}")
     
+    # Get the current session ID
+    session_id = None
+    try:
+        session_repo = get_session_repository()
+        session_record = session_repo.get_current_session_record()
+        if session_record:
+            session_id = session_record.id
+    except RuntimeError as e:
+        logger.warning(f"Could not get session ID for research note: {e}")
+
     try:
         # Create note in database using repository
-        created_note = get_research_note_repository().create(notes, human_input_id=human_input_id)
+        created_note = get_research_note_repository().create(
+            notes, human_input_id=human_input_id, session_id=session_id
+        )
         note_id = created_note.id
         
         # Format the note using the formatter
