@@ -39,12 +39,17 @@ def run_extract_plan(args):
     """
     Handles the 'extract-plan' command.
     """
-    plan = get_plan_for_session(args.session_id)
+    plan, found_session_id = get_plan_for_session(args.session_id)
     if plan:
-        print(f"Plan for session {args.session_id}:")
+        print(f"Plan for session {found_session_id}:")
         print(plan)
     else:
-        print(f"No plan found for session {args.session_id}.")
+        # If we asked for latest (args.session_id is None) and got nothing back (found_session_id is None)
+        if args.session_id is None and found_session_id is None:
+            print("No sessions found in the database.")
+        else:
+            # Otherwise a specific session was not found
+            print(f"No plan found for session {args.session_id}.")
     return 0
 
 def main():
@@ -66,10 +71,10 @@ def main():
 
     # extract-plan command
     parser_extract_plan = subparsers.add_parser(
-        "extract-plan", help="Extract the plan for a given session."
+        "extract-plan", help="Extract the plan for a given session. Defaults to the latest session."
     )
     parser_extract_plan.add_argument(
-        "session_id", type=int, help="The ID of the session."
+        "session_id", type=int, nargs='?', default=None, help="The ID of the session. If omitted, the latest session is used."
     )
     parser_extract_plan.set_defaults(func=run_extract_plan)
 

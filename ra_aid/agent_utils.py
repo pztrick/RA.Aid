@@ -114,7 +114,7 @@ def build_agent_kwargs(
 
             return base_state_modifier(state, max_input_tokens=max_input_tokens)
 
-        agent_kwargs["state_modifier"] = wrapped_state_modifier
+        agent_kwargs["prompt"] = wrapped_state_modifier
 
     # Important for anthropic callback handler to determine the correct model name given the agent
     agent_kwargs["name"] = model_name

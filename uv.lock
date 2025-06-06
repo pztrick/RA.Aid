@@ -2630,7 +2630,7 @@ requires-dist = [
     { name = "langchain-text-splitters", specifier = ">=0.3.7" },
     { name = "langgraph", specifier = ">=0.3.20" },
     { name = "langgraph-checkpoint", specifier = ">=2.0.23" },
-    { name = "langgraph-prebuilt", specifier = "<0.2.0" },
+    { name = "langgraph-prebuilt", specifier = ">=0.1.0" },
     { name = "langgraph-sdk", specifier = ">=0.1.59" },
     { name = "litellm", specifier = ">=1.60.6" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.4.1" },

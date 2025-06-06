@@ -10,7 +10,7 @@ VENV_RUFF := $(VENV)/bin/ruff
 VENV_PRE_COMMIT := $(VENV)/bin/pre-commit
 
 # Phony targets - list all targets that are not files
-.PHONY: all-costs check clean extract-plan fix fix-basic help last-cost migrate migrate-create migrate-status setup-dev setup-hooks test
+.PHONY: all-costs check clean extract-plan extract-last-plan fix fix-basic help last-cost migrate migrate-create migrate-status setup-dev setup-hooks test
 
 # ====================================================================================
 # HELP
@@ -37,6 +37,7 @@ help:
 	@echo "    last-cost                 - Display cost and token usage for the latest session"
 	@echo "    all-costs                 - Display cost and token usage for all sessions"
 	@echo "    extract-plan session_id=... - Extract the plan for a given session_id (e.g., make extract-plan session_id=1)"
+	@echo "    extract-last-plan         - Extract the plan for the most recent session"
 	@echo ""
 	@echo "  Housekeeping:"
 	@echo "    clean                     - Remove the virtual environment and build artifacts"
@@ -115,7 +116,16 @@ all-costs:
 	$(VENV_PYTHON) ra_aid/scripts/cli.py all
 
 extract-plan:
-	$(VENV_PYTHON) ra_aid/scripts/extract_plan.py $(session_id)
+	@if [ -z "$(session_id)" ]; then \
+		echo "Error: session_id is not set."; \
+		echo "Usage: make extract-plan session_id=<id>"; \
+		exit 1; \
+	fi
+	$(VENV_PYTHON) ra_aid/scripts/cli.py extract-plan $(session_id)
+
+extract-last-plan:
+	@echo "--> Extracting plan for the most recent session..."
+	$(VENV_PYTHON) ra_aid/scripts/cli.py extract-plan
 
 
 # ====================================================================================
