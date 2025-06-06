@@ -127,7 +127,10 @@ class Session(BaseModel):
     machine_info = peewee.TextField(
         null=True, help_text="JSON-encoded machine information"
     )
-    status = peewee.CharField(max_length=20, default='pending', index=True) # e.g., 'pending', 'running', 'completed', 'error', 'halting', 'halted'
+    status = peewee.CharField(
+        max_length=20, default="pending", index=True
+    )  # e.g., 'pending', 'running', 'completed', 'error', 'halting', 'halted'
+    plan = peewee.TextField(null=True)
 
     class Meta:
         table_name = "session"
@@ -252,7 +255,6 @@ class Trajectory(BaseModel):
     )
     session = peewee.ForeignKeyField(Session, backref="trajectories", null=True)
     # created_at and updated_at are inherited from BaseModel
-
 
     class Meta:
         table_name = "trajectory"

@@ -1,12 +1,10 @@
 """Context manager for tracking agent state and completion status."""
 
-import threading  # Keep for backward compatibility
 import contextvars
 from contextlib import contextmanager
 from typing import Optional
 from ra_aid.logging_config import get_logger
 from ra_aid.utils import agent_thread_manager
-from ra_aid.utils.agent_thread_manager import agent_thread_registry
 
 # Create contextvar to hold the agent context
 agent_context_var = contextvars.ContextVar("agent_context", default=None)

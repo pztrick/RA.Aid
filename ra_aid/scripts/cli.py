@@ -10,20 +10,13 @@ import json
 import argparse
 from ra_aid.scripts.last_session_usage import get_latest_session_usage
 from ra_aid.scripts.all_sessions_usage import get_all_sessions_usage
+from ra_aid.scripts.extract_plan import get_plan_for_session
 
-def session_usage_command():
+
+def run_latest_session_usage(args):
     """
-    Command-line entry point for getting usage statistics for the latest session.
-    
-    This function retrieves the latest session and calculates its total usage metrics,
-    then outputs the results as JSON to stdout.
+    Handles the 'latest' command.
     """
-    parser = argparse.ArgumentParser(description="Get usage statistics for the latest session")
-    parser.add_argument("--project-dir", help="Directory containing the .ra-aid folder (defaults to current directory)")
-    parser.add_argument("--db-path", help="Direct path to the database file (takes precedence over project-dir)")
-    
-    args = parser.parse_args(sys.argv[2:] if len(sys.argv) > 2 else [])
-    
     result, status_code = get_latest_session_usage(
         project_dir=args.project_dir,
         db_path=args.db_path
@@ -31,19 +24,10 @@ def session_usage_command():
     print(json.dumps(result, indent=2))
     return status_code
 
-def all_sessions_usage_command():
+def run_all_sessions_usage(args):
     """
-    Command-line entry point for getting usage statistics for all sessions.
-    
-    This function retrieves all sessions and calculates their usage metrics,
-    then outputs the results as JSON to stdout.
+    Handles the 'all' command.
     """
-    parser = argparse.ArgumentParser(description="Get usage statistics for all sessions")
-    parser.add_argument("--project-dir", help="Directory containing the .ra-aid folder (defaults to current directory)")
-    parser.add_argument("--db-path", help="Direct path to the database file (takes precedence over project-dir)")
-    
-    args = parser.parse_args(sys.argv[2:] if len(sys.argv) > 2 else [])
-    
     results, status_code = get_all_sessions_usage(
         project_dir=args.project_dir,
         db_path=args.db_path
@@ -51,30 +35,47 @@ def all_sessions_usage_command():
     print(json.dumps(results, indent=2))
     return status_code
 
+def run_extract_plan(args):
+    """
+    Handles the 'extract-plan' command.
+    """
+    plan = get_plan_for_session(args.session_id)
+    if plan:
+        print(f"Plan for session {args.session_id}:")
+        print(plan)
+    else:
+        print(f"No plan found for session {args.session_id}.")
+    return 0
+
 def main():
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(description="RA.Aid utility scripts")
-    subparsers = parser.add_subparsers(dest="command", help="Command to run")
-    
-    # Latest session command
-    latest_parser = subparsers.add_parser("latest", help="Get usage statistics for the latest session")
-    latest_parser.add_argument("--project-dir", help="Directory containing the .ra-aid folder (defaults to current directory)")
-    latest_parser.add_argument("--db-path", help="Direct path to the database file (takes precedence over project-dir)")
-    
-    # All sessions command
-    all_parser = subparsers.add_parser("all", help="Get usage statistics for all sessions")
-    all_parser.add_argument("--project-dir", help="Directory containing the .ra-aid folder (defaults to current directory)")
-    all_parser.add_argument("--db-path", help="Direct path to the database file (takes precedence over project-dir)")
-    
+    subparsers = parser.add_subparsers(dest="command", help="Command to run", required=True)
+
+    # latest session command
+    parser_latest = subparsers.add_parser("latest", help="Get usage statistics for the latest session")
+    parser_latest.add_argument("--project-dir", help="Directory containing the .ra-aid folder (defaults to current directory)")
+    parser_latest.add_argument("--db-path", help="Direct path to the database file (takes precedence over project-dir)")
+    parser_latest.set_defaults(func=run_latest_session_usage)
+
+    # all sessions command
+    parser_all = subparsers.add_parser("all", help="Get usage statistics for all sessions")
+    parser_all.add_argument("--project-dir", help="Directory containing the .ra-aid folder (defaults to current directory)")
+    parser_all.add_argument("--db-path", help="Direct path to the database file (takes precedence over project-dir)")
+    parser_all.set_defaults(func=run_all_sessions_usage)
+
+    # extract-plan command
+    parser_extract_plan = subparsers.add_parser(
+        "extract-plan", help="Extract the plan for a given session."
+    )
+    parser_extract_plan.add_argument(
+        "session_id", type=int, help="The ID of the session."
+    )
+    parser_extract_plan.set_defaults(func=run_extract_plan)
+
     args = parser.parse_args()
-    
-    if args.command == "latest" or not args.command:
-        return session_usage_command()
-    elif args.command == "all":
-        return all_sessions_usage_command()
-    else:
-        parser.print_help()
-        return 1
+    return args.func(args)
+
 
 if __name__ == "__main__":
     sys.exit(main())

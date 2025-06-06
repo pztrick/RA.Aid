@@ -336,7 +336,7 @@ models_params = {
             "token_limit": 1048576,
             "max_tokens": 1048576,
             "supports_temperature": True,
-            "default_temperature": 1.0,
+            "default_temperature": 0.3,
             "latency_coefficient": DEFAULT_BASE_LATENCY,
             "default_backend": AgentBackendType.CIAYN,
         },
@@ -344,9 +344,17 @@ models_params = {
             "token_limit": 1048576,
             "max_tokens": 1048576,  # Match token_limit as per gemini provider entry
             "supports_temperature": True,
-            "default_temperature": 1.0,  # Match gemini provider entry
+            "default_temperature": 0.3,  # Match gemini provider entry
             "latency_coefficient": DEFAULT_BASE_LATENCY,
             "default_backend": AgentBackendType.CIAYN,  # Match gemini provider entry
+        },
+        "google/gemini-2.5-pro-preview": {
+            "token_limit": 1048576,
+            "max_tokens": 1048576,
+            "supports_temperature": True,
+            "default_temperature": 0.3,
+            "latency_coefficient": DEFAULT_BASE_LATENCY,
+            "default_backend": AgentBackendType.CIAYN,
         },
         "anthropic/claude-sonnet-4": {
             "token_limit": 200000,
@@ -547,7 +555,7 @@ models_params = {
             "token_limit": 1048576,
             "max_tokens": 1048576,
             "supports_temperature": True,
-            "default_temperature": 1.0,
+            "default_temperature": 0.3,
             "latency_coefficient": DEFAULT_BASE_LATENCY,
             "default_backend": AgentBackendType.CIAYN,
         },
@@ -555,7 +563,7 @@ models_params = {
             "token_limit": 1048576,
             "max_tokens": 1048576,
             "supports_temperature": True,
-            "default_temperature": 1.0,
+            "default_temperature": 0.3,
             "latency_coefficient": DEFAULT_BASE_LATENCY,
             "default_backend": AgentBackendType.CIAYN,
         },
@@ -563,7 +571,7 @@ models_params = {
             "token_limit": 1048576,
             "max_tokens": 1048576,
             "supports_temperature": True,
-            "default_temperature": 1.0,
+            "default_temperature": 0.3,
             "latency_coefficient": DEFAULT_BASE_LATENCY,
             "default_backend": AgentBackendType.CIAYN,
         },

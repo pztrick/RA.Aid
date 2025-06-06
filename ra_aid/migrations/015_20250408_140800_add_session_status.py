@@ -12,10 +12,8 @@ def migrate(migrator: Migrator, database: pw.Database, fake=False, **kwargs):
     # This is a safety measure, though peewee-migrate might handle it.
     # A more robust check might involve inspecting the table directly if needed.
     try:
-        # Check if the column already exists - basic check using peewee introspection
-        # Note: Introspection capabilities might vary between DB backends
-        introspector = migrator.router.model_introspector
-        columns = introspector.get_columns('session')
+        # Check if the column already exists using database introspection
+        columns = database.get_columns('session')
         if 'status' not in [c.name for c in columns]:
              migrator.add_fields(
                  'session',
@@ -36,8 +34,7 @@ def rollback(migrator: Migrator, database: pw.Database, fake=False, **kwargs):
     logger.info("Removing status field from session table")
     try:
          # Check if the column exists before trying to remove it
-         introspector = migrator.router.model_introspector
-         columns = introspector.get_columns('session')
+         columns = database.get_columns('session')
          if 'status' in [c.name for c in columns]:
              migrator.remove_fields('session', 'status')
              logger.info("Successfully removed status field from session table")
