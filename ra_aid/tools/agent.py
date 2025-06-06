@@ -12,7 +12,6 @@ from ra_aid.agent_context import (
     get_depth,
     is_crashed,
     reset_completion_flags,
-    get_work_log,
 )
 from ra_aid.config import DEFAULT_MODEL
 from ra_aid.console.formatting import print_error, print_task_header
@@ -36,11 +35,10 @@ from ra_aid.model_formatters import format_key_facts_dict
 from ra_aid.model_formatters.key_snippets_formatter import format_key_snippets_dict
 from ra_aid.model_formatters.research_notes_formatter import format_research_notes_dict
 from ra_aid.database.repositories.session_repository import get_session_repository
-from ra_aid.tools.expert import get_model
 
 from ra_aid.llm import initialize_llm
-from .human import ask_human
-from .memory import get_related_files, get_work_log
+from ra_aid.tools.human import ask_human
+from ra_aid.tools.memory import get_related_files, get_work_log
 
 
 ResearchResult = Dict[str, Union[str, bool, Dict[int, Any], List[Any], None]]
