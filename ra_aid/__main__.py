@@ -953,7 +953,7 @@ def main():
 
                 # Update config repo with values from CLI arguments
                 store_limit_config(config_repo, args)
-                config_repo.set("research_and_plan_only", args.research_and_plan_only or args.research_plan_only)
+                config_repo.set("research_and_plan_only", args.research_and_plan_only)
                 config_repo.update(config)
                 config_repo.set("provider", args.provider)
                 config_repo.set("model", args.model)
