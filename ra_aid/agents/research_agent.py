@@ -388,7 +388,7 @@ YOU MUST FOLLOW THE EXPERT'S GUIDANCE OR ELSE BE TERMINATED!
     # Determine the research note based on the mode
     research_and_plan_only = get_config_repository().get("research_and_plan_only", False)
     if research_and_plan_only:
-        research_only_note = "Note: The --research-and-plan-only flag is active. Your goal is to conduct thorough research and produce comprehensive research notes. Another agent will use these notes to create a plan, but no code implementation will be performed."
+        research_only_note = "Note: The --research-and-plan-only flag is active. Your goal is to first conduct thorough research and use the emit_research_notes tool. Once research is complete, you must create a comprehensive implementation plan and use the emit_plan tool to output it. The process will exit after you emit the plan."
     elif research_only:
         research_only_note = ""
     else:

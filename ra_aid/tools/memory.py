@@ -85,6 +85,7 @@ def emit_plan(plan: str) -> str:
             # Check if we should exit after planning
             config_repo = get_config_repository()
             if config_repo.get("research_and_plan_only", False):
+                logger.info("Research and plan only mode is active, marking agent for exit.")
                 mark_should_exit(propagation_depth=1)
                 
             return "Plan stored successfully."

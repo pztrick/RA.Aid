@@ -237,7 +237,9 @@ def get_research_tools(
     tools.extend(RESEARCH_TOOLS)
 
     # Add modification tools if not research_only
-    if not research_only and not research_and_plan_only:
+    if research_and_plan_only:
+        tools.append(emit_plan)
+    elif not research_only:
         # For now, we ONLY do modifications after planning.
         # tools.extend(MODIFICATION_TOOLS)
         tools.append(request_implementation)
