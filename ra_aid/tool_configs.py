@@ -1,6 +1,5 @@
 import importlib.util
-import sys
-from typing import List, Optional
+from typing import List
 
 from langchain_core.tools import BaseTool
 from ra_aid.console import console
@@ -10,13 +9,9 @@ from ra_aid.tools import (
     ask_expert,
     ask_human,
     emit_expert_context,
-    emit_key_facts,
-    emit_key_snippet,
     emit_related_files,
     emit_research_notes,
     file_str_replace,
-    fuzzy_find_project_files,
-    list_directory_tree,
     mark_research_complete_no_implementation_required,
     put_complete_file_contents,
     read_file_tool,
@@ -105,7 +100,7 @@ def get_custom_tools() -> List[BaseTool]:
 
         # Log which tools were loaded (only during startup)
         if len(tools) > 0:
-            custom_tool_output = f"""These custom tools are available to the agent:
+            custom_tool_output = """These custom tools are available to the agent:
 """
             for tool in tools:
                 custom_tool_output += f"* {tool.name}: {tool.description}\n"
@@ -123,7 +118,7 @@ def get_custom_tools() -> List[BaseTool]:
 
         return tools
 
-    except Exception as e:
+    except Exception:
         raise
 
 
@@ -202,7 +197,7 @@ RESEARCH_TOOLS = [
     # one_shot_completed,
     # monorepo_detected,
     # ui_detected,
-    mark_research_complete_no_implementation_required,
+    # mark_research_complete_no_implementation_required, # Will be added conditionally
 ]
 
 
@@ -234,12 +229,21 @@ def get_research_tools(
         human_interaction, web_research_enabled, use_aider=use_aider
     ).copy()
 
-    tools.extend(RESEARCH_TOOLS)
+    tools.extend(RESEARCH_TOOLS) # Add common research tools
+
+    # Conditionally add mark_research_complete_no_implementation_required
+    # The research_only argument to this function is the one from the agent's direct call,
+    # not necessarily the global CLI flag. We should check the global config.
+    config_repo = get_config_repository()
+    is_global_research_only = config_repo.get("research_only", False)
+
+    if is_global_research_only:
+        tools.append(mark_research_complete_no_implementation_required)
 
     # Add modification tools if not research_only
     if research_and_plan_only:
         tools.append(emit_plan)
-    elif not research_only:
+    elif not is_global_research_only: # Check global flag here too
         # For now, we ONLY do modifications after planning.
         # tools.extend(MODIFICATION_TOOLS)
         tools.append(request_implementation)
