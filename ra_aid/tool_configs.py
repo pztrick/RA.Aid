@@ -275,7 +275,7 @@ def get_planning_tools(
         "research_and_plan_only", False
     )
     if research_and_plan_only:
-        return [emit_plan]
+        return []
 
     # Get config for use_aider value
     use_aider = False

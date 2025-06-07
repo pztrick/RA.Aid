@@ -30,6 +30,7 @@ class AgentContext:
         self.agent_should_exit = False
         self.agent_has_crashed = False
         self.agent_crashed_message = None
+        self.research_notes_emitted = False
 
         # Note: Completion flags (task_completed, plan_completed, completion_message,
         # agent_should_exit) are no longer inherited from parent contexts
@@ -106,6 +107,10 @@ class AgentContext:
         """Check if the current context is marked as completed."""
         return self.task_completed or self.plan_completed
         
+    def mark_research_notes_emitted(self):
+        """Mark that research notes have been emitted."""
+        self.research_notes_emitted = True
+
     @property
     def depth(self) -> int:
         """Calculate the depth of this context based on parent chain.
@@ -285,3 +290,20 @@ def get_crash_message() -> Optional[str]:
     """
     context = get_current_context()
     return context.agent_crashed_message if context and context.is_crashed() else None
+
+
+def mark_research_notes_emitted():
+    """Mark that research notes have been emitted in the current context."""
+    context = get_current_context()
+    if context:
+        context.mark_research_notes_emitted()
+
+
+def have_research_notes_been_emitted() -> bool:
+    """Check if research notes have been emitted in the current context.
+    
+    Returns:
+        bool: True if research notes have been emitted, False otherwise
+    """
+    context = get_current_context()
+    return context.research_notes_emitted if context else False

@@ -13,6 +13,8 @@ from ra_aid.agent_context import (
     mark_plan_completed,
     mark_should_exit,
     mark_task_completed,
+    have_research_notes_been_emitted,
+    mark_research_notes_emitted,
 )
 from ra_aid.database.repositories.key_fact_repository import get_key_fact_repository
 from ra_aid.database.repositories.key_snippet_repository import get_key_snippet_repository
@@ -54,6 +56,12 @@ def emit_plan(plan: str) -> str:
     Returns:
         A confirmation message indicating the plan was stored.
     """
+    from ra_aid.database.repositories.config_repository import get_config_repository
+    config_repo = get_config_repository()
+    if config_repo.get("research_and_plan_only", False):
+        if not have_research_notes_been_emitted():
+            return "Error: You must call `emit_research_notes` at least once before calling `emit_plan` when in --research-and-plan-only mode. Please emit your research notes first."
+    
     try:
         session_repo = get_session_repository()
         session_record = session_repo.get_current_session_record()
@@ -159,6 +167,9 @@ def emit_research_notes(notes: str) -> str:
         cpm(formatted_note, title="🔍 Research Notes")
         
         log_work_event(f"Stored research note #{note_id}.")
+        
+        # Mark research notes as emitted
+        mark_research_notes_emitted()
         
         # Check if we need to clean up notes (more than 30)
         try:

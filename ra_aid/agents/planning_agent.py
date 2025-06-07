@@ -71,6 +71,12 @@ def run_planning_agent(
     Returns:
         Optional[str]: The completion message if planning completed successfully
     """
+    from ra_aid.database.repositories.config_repository import get_config_repository
+    config_repo = get_config_repository()
+    if config_repo.get("research_and_plan_only", False):
+        logger.warning("`run_planning_agent` was called in --research-and-plan-only mode, which should not happen. Aborting planning.")
+        return None
+        
     thread_id = thread_id or str(uuid.uuid4())
     logger.debug("Starting planning agent with thread_id=%s", thread_id)
     logger.debug("Planning configuration: expert=%s, hil=%s", expert_enabled, hil)
