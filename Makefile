@@ -10,7 +10,7 @@ VENV_RUFF := $(VENV)/bin/ruff
 VENV_PRE_COMMIT := $(VENV)/bin/pre-commit
 
 # Phony targets - list all targets that are not files
-.PHONY: all-costs check clean extract-plan extract-last-plan extract-last-research-notes fix fix-basic help last-cost migrate migrate-create migrate-status setup-dev setup-hooks test
+.PHONY: all-costs check clean extract-plan extract-last-plan extract-last-research-notes fix fix-basic help last-cost migrate migrate-create migrate-status setup-dev setup-dev-uv setup-hooks test
 
 # ====================================================================================
 # HELP
@@ -19,7 +19,8 @@ help:
 	@echo "Available targets:"
 	@echo ""
 	@echo "  Setup (run first!):"
-	@echo "    setup-dev                 - Create venv using 'uv' and install dependencies"
+	@echo "    setup-dev                 - Create venv using standard 'pip' and install dependencies"
+	@echo "    setup-dev-uv              - Create venv using 'uv' and install dependencies"
 	@echo "    setup-hooks               - Install git pre-commit hooks (run after setup-dev)"
 	@echo ""
 	@echo "  Quality & Testing:"
@@ -48,8 +49,16 @@ help:
 # SETUP
 # ====================================================================================
 
-# Install development dependencies using uv.
+# Install development dependencies using standard pip.
 setup-dev:
+	@echo "--> Creating virtual environment using python venv..."
+	python -m venv $(VENV)
+	@echo "--> Installing dependencies using pip..."
+	$(VENV_PYTHON) -m pip install -e ".[dev]"
+	@echo "Setup complete. Virtual environment is ready."
+
+# Install development dependencies using uv.
+setup-dev-uv:
 	@if ! command -v uv &> /dev/null; then \
 		echo "Error: 'uv' is not installed. Please install it first."; \
 		echo "See: https://github.com/astral-sh/uv"; \
