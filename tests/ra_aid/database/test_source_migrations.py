@@ -183,14 +183,14 @@ class TestSourceMigrations:
                     
                     # Mock init_migrations and apply_migrations
                     mock_migration_manager = MagicMock()
-                    mock_migration_manager.apply_migrations.return_value = True
+                    mock_migration_manager.apply_migrations.return_value = (True, None)
                     
                     with patch("ra_aid.database.migrations.init_migrations", return_value=mock_migration_manager):
                         # Call ensure_migrations_applied
                         result = ensure_migrations_applied()
                         
                         # Verify result
-                        assert result is True
+                        assert result == (True, None)
                         
                         # Verify .ra-aid directory was created
                         assert os.path.exists(ra_aid_dir)
@@ -203,11 +203,11 @@ class TestSourceMigrations:
             result = ensure_migrations_applied()
             
             # Verify result is False on error
-            assert result is False
+            assert result[0] is False
             
             # Verify error was logged
-            mock_logger.error.assert_called_with(
-                "Failed to ensure .ra-aid directory exists: Permission denied"
+            mock_logger.exception.assert_called_with(
+                "Failed to ensure .ra-aid directory exists or initialize migrations: Permission denied"
             )
             
     def test_ensure_migrations_applied_uses_package_migrations(self, temp_dir, mock_logger):
@@ -236,7 +236,7 @@ class TestSourceMigrations:
                     
                     # Create a mock migration manager that we can verify
                     mock_init_migrations = MagicMock()
-                    mock_init_migrations.apply_migrations.return_value = True
+                    mock_init_migrations.apply_migrations.return_value = (True, None)
                     
                     with patch("ra_aid.database.migrations.init_migrations", return_value=mock_init_migrations) as mock_init:
                         # Call ensure_migrations_applied
@@ -246,7 +246,7 @@ class TestSourceMigrations:
                         mock_init.assert_called_once()
                         # We can't verify the exact path since it's derived from non-mock objects
                         # Instead, verify that init_migrations was called and succeeded
-                        assert result is True
+                        assert result == (True, None)
                         
     def test_router_initialization_with_source_migrations(self, temp_dir, mock_logger):
         """Test that the migration router is initialized with the source package migrations."""

@@ -17,19 +17,26 @@ from ra_aid.agent_context import (
     mark_research_notes_emitted,
 )
 from ra_aid.database.repositories.key_fact_repository import get_key_fact_repository
-from ra_aid.database.repositories.key_snippet_repository import get_key_snippet_repository
-from ra_aid.database.repositories.human_input_repository import get_human_input_repository
-from ra_aid.database.repositories.research_note_repository import get_research_note_repository
+from ra_aid.database.repositories.key_snippet_repository import (
+    get_key_snippet_repository,
+)
+from ra_aid.database.repositories.human_input_repository import (
+    get_human_input_repository,
+)
+from ra_aid.database.repositories.research_note_repository import (
+    get_research_note_repository,
+)
 from ra_aid.database.repositories.session_repository import get_session_repository
 from ra_aid.database.repositories.trajectory_repository import get_trajectory_repository
 from ra_aid.database.repositories.work_log_repository import get_work_log_repository
 from ra_aid.database.repositories.config_repository import get_config_repository
 from ra_aid.model_formatters import key_snippets_formatter
 from ra_aid.logging_config import get_logger
-from ra_aid.database.repositories.related_files_repository import get_related_files_repository
+from ra_aid.database.repositories.related_files_repository import (
+    get_related_files_repository,
+)
 
 logger = get_logger(__name__)
-
 
 
 class SnippetInfo(TypedDict):
@@ -51,7 +58,9 @@ def _check_emit_plan_preconditions() -> Optional[str]:
     return None
 
 
-def _save_plan_to_current_session(plan: str) -> Optional[Any]: # Using Any for Session type as it's not imported here
+def _save_plan_to_current_session(
+    plan: str,
+) -> Optional[Any]:  # Using Any for Session type as it's not imported here
     """
     Saves the plan to the current session record.
     Logs a work event upon successful save.
@@ -91,7 +100,7 @@ def _record_plan_trajectory_entry(plan: str) -> None:
 def _display_plan_and_conditionally_exit(plan: str) -> None:
     """Displays the stored plan and handles conditional exit for research_and_plan_only mode."""
     cpm(plan, title="📝 Plan Stored")
-    
+
     config_repo = get_config_repository()
     if config_repo.get("research_and_plan_only", False):
         logger.info("Research and plan only mode is active, marking agent for exit.")
@@ -117,21 +126,15 @@ def emit_plan(plan: str) -> str:
         return precondition_error
 
     try:
-        # Attempt to save the plan to the current session.
-        # _save_plan_to_current_session handles getting session, saving plan, and logging work event.
-        # It returns the session_record on success, None if no active session is found (error logged by helper).
         session_record = _save_plan_to_current_session(plan)
-        
+
         if not session_record:
-            # If session_record is None, _save_plan_to_current_session has already logged the specific error.
             return "Error: No active session found."
 
-        # If plan saving was successful, record it in the trajectory.
         _record_plan_trajectory_entry(plan)
-        
-        # Display the plan to the user and handle any conditional exit logic.
+
         _display_plan_and_conditionally_exit(plan)
-        
+
         return "Plan stored successfully."
 
     except Exception as e:
@@ -156,16 +159,17 @@ def emit_research_notes(notes: str) -> str:
     note_id = None
 
     try:
-        # Create research note
         created_note = get_research_note_repository().create(
             notes, human_input_id=human_input_id, session_id=session_id
         )
         note_id = created_note.id
-        
-        from ra_aid.model_formatters.research_notes_formatter import format_research_note
+
+        from ra_aid.model_formatters.research_notes_formatter import (
+            format_research_note,
+        )
+
         formatted_note = format_research_note(note_id, notes)
-        
-        # Record to trajectory
+
         trajectory_repo = get_trajectory_repository()
         trajectory_repo.create(
             tool_name="emit_research_notes",
@@ -175,23 +179,27 @@ def emit_research_notes(notes: str) -> str:
                 "display_title": "Research Notes",
             },
             record_type="emit_research_notes",
-            human_input_id=human_input_id
+            human_input_id=human_input_id,
         )
-        
+
         cpm(formatted_note, title="🔍 Research Notes")
         log_work_event(f"Stored research note #{note_id}.")
         mark_research_notes_emitted()
-        
+
     except RuntimeError as e:
         # This catches errors from both create_note and create_trajectory
-        if note_id is not None: # Note was created, but trajectory failed
-            logger.warning(f"Failed to record trajectory for research note #{note_id}: {str(e)}")
+        if note_id is not None:  # Note was created, but trajectory failed
+            logger.warning(
+                f"Failed to record trajectory for research note #{note_id}: {str(e)}"
+            )
             # Proceed to display and log the note even if trajectory fails
             cpm(formatted_note, title="🔍 Research Notes")
             log_work_event(f"Stored research note #{note_id}.")
             mark_research_notes_emitted()
-        else: # Note creation failed
-            logger.error(f"Failed to access research note repository or record trajectory: {str(e)}")
+        else:  # Note creation failed
+            logger.error(
+                f"Failed to access research note repository or record trajectory: {str(e)}"
+            )
             console.print(f"Error storing research note: {str(e)}", style="red")
             return "Failed to store research note."
 
@@ -200,14 +208,23 @@ def emit_research_notes(notes: str) -> str:
         all_notes = get_research_note_repository().get_all()
         if len(all_notes) > 30:
             try:
-                from ra_aid.agents.research_notes_gc_agent import run_research_notes_gc_agent
+                from ra_aid.agents.research_notes_gc_agent import (
+                    run_research_notes_gc_agent,
+                )
+
                 run_research_notes_gc_agent()
             except Exception as e:
                 logger.error(f"Failed to run research notes cleaner: {str(e)}")
     except RuntimeError as e:
-        logger.error(f"Failed to access research note repository for cleanup check: {str(e)}")
-            
-    return f"Research note #{note_id} stored." if note_id else "Failed to store research note."
+        logger.error(
+            f"Failed to access research note repository for cleanup check: {str(e)}"
+        )
+
+    return (
+        f"Research note #{note_id} stored."
+        if note_id
+        else "Failed to store research note."
+    )
 
 
 @tool("emit_key_facts")
@@ -218,13 +235,15 @@ def emit_key_facts(facts: List[str]) -> str:
         facts: List of key facts to store
     """
     results = []
-    
+
     human_input_id = _get_most_recent_human_input_id()
-    
+
     for fact in facts:
         try:
             # Create fact in database using repository
-            created_fact = get_key_fact_repository().create(fact, human_input_id=human_input_id)
+            created_fact = get_key_fact_repository().create(
+                fact, human_input_id=human_input_id
+            )
             fact_id = created_fact.id
         except RuntimeError as e:
             logger.error(f"Failed to access key fact repository: {str(e)}")
@@ -243,23 +262,19 @@ def emit_key_facts(facts: List[str]) -> str:
                     "display_title": f"Key Fact #{fact_id}",
                 },
                 record_type="memory_operation",
-                human_input_id=human_input_id
+                human_input_id=human_input_id,
             )
         except RuntimeError as e:
             logger.warning(f"Failed to record trajectory: {str(e)}")
 
         # Display panel with ID
-        cpm(
-            fact,
-            title=f"💡 Key Fact #{fact_id}",
-            border_style="bright_cyan"
-        )
+        cpm(fact, title=f"💡 Key Fact #{fact_id}", border_style="bright_cyan")
 
         # Add result message
         results.append(f"Stored fact #{fact_id}: {fact}")
 
     log_work_event(f"Stored {len(facts)} key facts.")
-    
+
     # Check if we need to clean up facts (more than 30)
     try:
         all_facts = get_key_fact_repository().get_all()
@@ -267,15 +282,14 @@ def emit_key_facts(facts: List[str]) -> str:
             # Trigger the key facts cleaner agent
             try:
                 from ra_aid.agents.key_facts_gc_agent import run_key_facts_gc_agent
+
                 run_key_facts_gc_agent()
             except Exception as e:
                 logger.error(f"Failed to run key facts cleaner: {str(e)}")
     except RuntimeError as e:
         logger.error(f"Failed to access key fact repository: {str(e)}")
-    
+
     return "Facts stored."
-
-
 
 
 @tool("emit_key_snippet")
@@ -311,7 +325,7 @@ def emit_key_snippet(snippet_info: SnippetInfo) -> str:
         description=snippet_info["description"],
         human_input_id=human_input_id,
     )
-    
+
     # Get the snippet ID from the database record
     snippet_id = key_snippet.id
 
@@ -340,7 +354,7 @@ def emit_key_snippet(snippet_info: SnippetInfo) -> str:
                     "line_number": snippet_info["line_number"],
                     "description": snippet_info["description"],
                     # Omit the full snippet content to avoid duplicating large text in the database
-                    "snippet_length": len(snippet_info["snippet"])
+                    "snippet_length": len(snippet_info["snippet"]),
                 }
             },
             step_data={
@@ -350,7 +364,7 @@ def emit_key_snippet(snippet_info: SnippetInfo) -> str:
                 "display_title": f"Key Snippet #{snippet_id}",
             },
             record_type="memory_operation",
-            human_input_id=human_input_id
+            human_input_id=human_input_id,
         )
     except RuntimeError as e:
         logger.warning(f"Failed to record trajectory: {str(e)}")
@@ -359,21 +373,22 @@ def emit_key_snippet(snippet_info: SnippetInfo) -> str:
     cpm(
         "\n".join(display_text),
         title=f"📝 Key Snippet #{snippet_id}",
-        border_style="bright_cyan"
+        border_style="bright_cyan",
     )
 
     log_work_event(f"Stored code snippet #{snippet_id}.")
-    
+
     # Check if we need to clean up snippets (more than 20)
     all_snippets = get_key_snippet_repository().get_all()
     if len(all_snippets) > 35:
         # Trigger the key snippets cleaner agent
         try:
             from ra_aid.agents.key_snippets_gc_agent import run_key_snippets_gc_agent
+
             run_key_snippets_gc_agent()
         except Exception as e:
             logger.error(f"Failed to run key snippets cleaner: {str(e)}")
-    
+
     return f"Snippet #{snippet_id} stored."
 
 
@@ -387,7 +402,7 @@ def one_shot_completed(message: str) -> str:
         message: Completion message to display
     """
     mark_task_completed(message)
-    
+
     # Record to trajectory before displaying panel
     human_input_id = None
     try:
@@ -401,11 +416,11 @@ def one_shot_completed(message: str) -> str:
                 "display_title": "Task Completed",
             },
             record_type="task_completion",
-            human_input_id=human_input_id
+            human_input_id=human_input_id,
         )
     except RuntimeError as e:
         logger.warning(f"Failed to record trajectory: {str(e)}")
-    
+
     cpm(message, title="✅ Task Completed")
     log_work_event(f"Task completed:\n\n{message}")
     return "Completion noted."
@@ -419,7 +434,7 @@ def task_completed(message: str) -> str:
         message: Message explaining how/why the task is complete
     """
     mark_task_completed(message)
-    
+
     # Record to trajectory before displaying panel
     human_input_id = None
     try:
@@ -433,11 +448,11 @@ def task_completed(message: str) -> str:
                 "display_title": "Task Completed",
             },
             record_type="task_completion",
-            human_input_id=human_input_id
+            human_input_id=human_input_id,
         )
     except RuntimeError as e:
         logger.warning(f"Failed to record trajectory: {str(e)}")
-    
+
     cpm(message, title="✅ Task Completed")
     log_work_event(f"Task completed:\n\n{message}")
     return "Completion noted."
@@ -452,7 +467,7 @@ def plan_implementation_completed(message: str) -> str:
     """
     mark_should_exit(propagation_depth=1)
     mark_plan_completed(message)
-    
+
     # Record to trajectory before displaying panel
     human_input_id = None
     try:
@@ -466,11 +481,11 @@ def plan_implementation_completed(message: str) -> str:
                 "display_title": "Plan Executed",
             },
             record_type="plan_completion",
-            human_input_id=human_input_id
+            human_input_id=human_input_id,
         )
     except RuntimeError as e:
         logger.warning(f"Failed to record trajectory: {str(e)}")
-    
+
     cpm(message, title="✅ Plan Executed")
     log_work_event(f"Completed implementation:\n\n{message}")
     return "Plan completion noted."
@@ -494,14 +509,14 @@ def emit_related_files(files: List[str]) -> str:
         files: List of file paths to add
     """
     repo = get_related_files_repository()
-    
+
     # Store the repository's ID counter value before adding any files
     try:
         initial_next_id = repo.get_next_id()
     except (AttributeError, TypeError):
         # Handle case where repo is mocked in tests
         initial_next_id = 0  # Use a safe default for mocked environments
-    
+
     results = []
     added_files = []
     invalid_paths = []
@@ -535,7 +550,7 @@ def emit_related_files(files: List[str]) -> str:
 
         # Add file to repository
         file_id = repo.add_file(file)
-        
+
         if file_id is not None:
             # Check if it's a truly new file (ID >= initial_next_id)
             try:
@@ -543,25 +558,25 @@ def emit_related_files(files: List[str]) -> str:
             except TypeError:
                 # Handle case where file_id or initial_next_id is mocked in tests
                 is_truly_new = True  # Default to True in test environments
-            
+
             # Also check for duplicates within this function call
             is_duplicate_in_call = False
             for r in results:
                 if r.startswith(f"File ID #{file_id}:"):
                     is_duplicate_in_call = True
                     break
-                    
+
             # Only add to added_files if it's truly new AND not a duplicate in this call
             if is_truly_new and not is_duplicate_in_call:
                 added_files.append((file_id, file))  # Keep original path for display
-                
+
             results.append(f"File ID #{file_id}: {file}")
 
     # Record to trajectory before displaying panel for added files
     if added_files:
         files_added_md = "\n".join(f"- `{file}`" for id, file in added_files)
         md_content = f"**Files Noted:**\n{files_added_md}"
-        
+
         human_input_id = None
         try:
             human_input_id = get_human_input_repository().get_most_recent_id()
@@ -575,22 +590,18 @@ def emit_related_files(files: List[str]) -> str:
                     "display_title": "Related Files Noted",
                 },
                 record_type="memory_operation",
-                human_input_id=human_input_id
+                human_input_id=human_input_id,
             )
         except RuntimeError as e:
             logger.warning(f"Failed to record trajectory: {str(e)}")
-        
-        cpm(
-            md_content,
-            title="📁 Related Files Noted",
-            border_style="green"
-        )
+
+        cpm(md_content, title="📁 Related Files Noted", border_style="green")
 
     # Record to trajectory before displaying panel for binary files
     if binary_files:
         binary_files_md = "\n".join(f"- `{file}`" for file in binary_files)
         md_content = f"**Binary Files Skipped:**\n{binary_files_md}"
-        
+
         human_input_id = None
         try:
             human_input_id = get_human_input_repository().get_most_recent_id()
@@ -603,16 +614,12 @@ def emit_related_files(files: List[str]) -> str:
                     "display_title": "Binary Files Not Added",
                 },
                 record_type="memory_operation",
-                human_input_id=human_input_id
+                human_input_id=human_input_id,
             )
         except RuntimeError as e:
             logger.warning(f"Failed to record trajectory: {str(e)}")
-        
-        cpm(
-            md_content,
-            title="⚠️ Binary Files Not Added",
-            border_style="yellow"
-        )
+
+        cpm(md_content, title="⚠️ Binary Files Not Added", border_style="yellow")
 
     # Return summary message
     if binary_files:
@@ -644,8 +651,6 @@ def log_work_event(event: str) -> str:
     except RuntimeError as e:
         logger.error(f"Failed to access work log repository: {str(e)}")
         return f"Failed to log event: {str(e)}"
-
-
 
 
 def get_work_log() -> str:
@@ -720,18 +725,14 @@ def deregister_related_files(file_ids: List[int]) -> str:
     """
     repo = get_related_files_repository()
     results = []
-    
+
     for file_id in file_ids:
         deleted_file = repo.remove_file(file_id)
         if deleted_file:
             success_msg = (
                 f"Successfully removed related file #{file_id}: {deleted_file}"
             )
-            cpm(
-                success_msg,
-                title="File Reference Removed",
-                border_style="green"
-            )
+            cpm(success_msg, title="File Reference Removed", border_style="green")
             results.append(success_msg)
 
     return "Files noted."

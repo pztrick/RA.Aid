@@ -238,7 +238,7 @@ class TestMigrationManager:
             result = manager.apply_migrations()
 
             # Verify result
-            assert result is True
+            assert result == (True, None)
 
             # Verify migrations were applied
             mock_router.run.assert_called_once_with("002_add_users", fake=False)
@@ -270,7 +270,7 @@ class TestMigrationManager:
             result = manager.apply_migrations()
 
             # Verify result
-            assert result is True
+            assert result == (True, None)
 
             # Verify no migrations were applied
             mock_router.run.assert_not_called()
@@ -298,10 +298,11 @@ class TestMigrationManager:
             result = manager.apply_migrations()
 
             # Verify result
-            assert result is False
+            assert result[0] is False
+            assert "Failed to apply migration 002_add_users: Migration error" in result[1]
 
             # Verify error was logged
-            mock_logger.error.assert_called_with(
+            mock_logger.exception.assert_called_with(
                 "Failed to apply migration 002_add_users: Migration error"
             )
 
@@ -352,8 +353,8 @@ class TestMigrationManager:
             assert result is None
 
             # Verify error was logged
-            mock_logger.error.assert_called_with(
-                "Failed to create migration: Creation error"
+            mock_logger.exception.assert_called_with(
+                "Failed to create migration"
             )
 
     def test_get_migration_status(self, cleanup_db, temp_dir, mock_router):
@@ -401,7 +402,7 @@ class TestMigrationFunctions:
         """Test ensure_migrations_applied applies pending migrations."""
         # Mock MigrationManager
         mock_manager = MagicMock()
-        mock_manager.apply_migrations.return_value = True
+        mock_manager.apply_migrations.return_value = (True, None)
 
         # Call ensure_migrations_applied
         with patch(
@@ -410,7 +411,7 @@ class TestMigrationFunctions:
             result = ensure_migrations_applied()
 
             # Verify result
-            assert result is True
+            assert result == (True, None)
 
             # Verify migrations were applied
             mock_manager.apply_migrations.assert_called_once()
@@ -425,11 +426,12 @@ class TestMigrationFunctions:
             result = ensure_migrations_applied()
 
             # Verify result is False on error
-            assert result is False
+            assert result[0] is False
+            assert "Test error" in result[1]
 
             # Verify error was logged
-            mock_logger.error.assert_called_with(
-                "Failed to apply migrations: Test error"
+            mock_logger.exception.assert_called_with(
+                "Failed to apply migrations during ensure_migrations_applied: Test error"
             )
 
     def test_create_new_migration(self, cleanup_db, mock_logger):
@@ -465,8 +467,8 @@ class TestMigrationFunctions:
             assert result is None
 
             # Verify error was logged
-            mock_logger.error.assert_called_with(
-                "Failed to create migration: Test error"
+            mock_logger.exception.assert_called_with(
+                "Failed to create migration in create_new_migration"
             )
 
     def test_get_migration_status(self, cleanup_db, mock_logger):
@@ -516,8 +518,8 @@ class TestMigrationFunctions:
             assert status["pending"] == []
 
             # Verify error was logged
-            mock_logger.error.assert_called_with(
-                "Failed to get migration status: Test error"
+            mock_logger.exception.assert_called_with(
+                "Failed to get migration status"
             )
 
 
@@ -571,7 +573,7 @@ def rollback(migrator, database, fake=False, **kwargs):
 
                 # Apply migrations
                 result = manager.apply_migrations()
-                assert result is True
+                assert result == (True, None)
 
                 # Check migrations again
                 applied, pending = manager.check_migrations()

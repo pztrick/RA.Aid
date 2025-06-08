@@ -139,7 +139,7 @@ def test_main_with_wipe_project_memory_flag():
         project_state_dir=None,
         session_id=None,  # Ensure this is None as checked in main
         version=False,    # Default value checked early
-        list_tools=False, # Default value checked early
+        command=None,     # Add command attribute for new arg parser
         log_level='INFO', # Needed for setup_logging mock
         log_file=None,    # Needed for setup_logging mock
         log_mode='file',  # Add log_mode with default value
