@@ -222,14 +222,16 @@ def get_research_tools(
     except (ImportError, RuntimeError):
         pass
 
-    research_and_plan_only = get_config_repository().get("research_and_plan_only", False)
+    research_and_plan_only = get_config_repository().get(
+        "research_and_plan_only", False
+    )
 
     # Start with read-only tools
     tools = get_read_only_tools(
         human_interaction, web_research_enabled, use_aider=use_aider
     ).copy()
 
-    tools.extend(RESEARCH_TOOLS) # Add common research tools
+    tools.extend(RESEARCH_TOOLS)  # Add common research tools
 
     # Conditionally add mark_research_complete_no_implementation_required
     # The research_only argument to this function is the one from the agent's direct call,
@@ -243,7 +245,7 @@ def get_research_tools(
     # Add modification tools if not research_only
     if research_and_plan_only:
         tools.append(emit_plan)
-    elif not is_global_research_only: # Check global flag here too
+    elif not is_global_research_only:  # Check global flag here too
         # For now, we ONLY do modifications after planning.
         # tools.extend(MODIFICATION_TOOLS)
         tools.append(request_implementation)
@@ -271,25 +273,12 @@ def get_planning_tools(
         expert_enabled: Whether to include expert tools
         web_research_enabled: Whether to include web research tools
     """
-    research_and_plan_only = get_config_repository().get(
-        "research_and_plan_only", False
-    )
-    if research_and_plan_only:
-        return []
+    use_aider = get_config_repository().get("use_aider", False)
 
-    # Get config for use_aider value
-    use_aider = False
-    try:
-        use_aider = get_config_repository().get("use_aider", False)
-    except (ImportError, RuntimeError):
-        pass
-
-    # Start with read-only tools
     tools = get_read_only_tools(
         web_research_enabled=web_research_enabled, use_aider=use_aider
     ).copy()
 
-    # Add planning-specific tools
     planning_tools = [
         request_task_implementation,
         plan_implementation_completed,

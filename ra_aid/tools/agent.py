@@ -548,7 +548,9 @@ def request_task_implementation(task_spec: str) -> str:
     # Add work log
     if response_data.get("work_log"):
         markdown_parts.append(f"\n## Work Log\n\n{response_data['work_log']}")
-        markdown_parts.append("\n\nTHE ABOVE WORK HAS BEEN COMPLETED")
+        markdown_parts.append(
+            "\n\nTHE ABOVE WORK HAS ALREADY BEEN COMPLETED --**DO NOT REQUEST IMPLEMENTATION OF IT AGAIN**"
+        )
 
     # Join all parts into a single markdown string
     markdown_output = "".join(markdown_parts)
@@ -571,26 +573,24 @@ def request_implementation(task_spec: str) -> str:
     )
 
     hil_enabled = get_config_repository().get("hil", False)
-    plan = None
 
     try:
-        # Run planning agent
         from ..agents import run_planning_agent
 
         reset_completion_flags()
 
-        plan = run_planning_agent(
+        run_planning_agent(
             task_spec,
             model,
             expert_enabled=True,
             hil=hil_enabled,
         )
 
-        session_repo = get_session_repository()
-        session_record = session_repo.get_current_session_record()
-        if session_record:
-            session_record.plan = plan
-            session_record.save()
+        # session_repo = get_session_repository() # Plan is now emitted by the agent
+        # session_record = session_repo.get_current_session_record()
+        # if session_record:
+        # session_record.plan = plan # Plan is now emitted by the agent
+        # session_record.save()
 
         success = True
         reason = None
@@ -657,7 +657,6 @@ def request_implementation(task_spec: str) -> str:
         "reason": reason,
         "agent_crashed": agent_crashed,
         "crash_message": crash_message,
-        "plan": plan,
         "key_facts": key_facts,
         "related_files": get_related_files(),
         "key_snippets": key_snippets,

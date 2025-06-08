@@ -42,6 +42,62 @@ class SnippetInfo(TypedDict):
 console = Console()
 
 
+def _check_emit_plan_preconditions() -> Optional[str]:
+    """Checks preconditions for emitting a plan, specifically for research_and_plan_only mode."""
+    config_repo = get_config_repository()
+    if config_repo.get("research_and_plan_only", False):
+        if not have_research_notes_been_emitted():
+            return "Error: You must call `emit_research_notes` at least once before calling `emit_plan` when in --research-and-plan-only mode. Please emit your research notes first."
+    return None
+
+
+def _save_plan_to_current_session(plan: str) -> Optional[Any]: # Using Any for Session type as it's not imported here
+    """
+    Saves the plan to the current session record.
+    Logs a work event upon successful save.
+    Returns the session record on success, None otherwise.
+    """
+    session_repo = get_session_repository()
+    session_record = session_repo.get_current_session_record()
+
+    if session_record:
+        session_record.plan = plan
+        session_record.save()  # This might raise an exception, caught by emit_plan's main try/except
+        log_work_event("Stored implementation plan.")
+        return session_record
+    else:
+        logger.error("No active session found to store the plan.")
+        return None
+
+
+def _record_plan_trajectory_entry(plan: str) -> None:
+    """Records the emit_plan event to the trajectory database."""
+    try:
+        human_input_id = get_human_input_repository().get_most_recent_id()
+        get_trajectory_repository().create(
+            tool_name="emit_plan",
+            tool_parameters={"plan": plan},
+            step_data={
+                "display_title": "Plan Stored",
+                "plan_length": len(plan),
+            },
+            record_type="emit_plan",
+            human_input_id=human_input_id,
+        )
+    except RuntimeError as e:
+        logger.warning(f"Failed to record trajectory for emit_plan: {str(e)}")
+
+
+def _display_plan_and_conditionally_exit(plan: str) -> None:
+    """Displays the stored plan and handles conditional exit for research_and_plan_only mode."""
+    cpm(plan, title="📝 Plan Stored")
+    
+    config_repo = get_config_repository()
+    if config_repo.get("research_and_plan_only", False):
+        logger.info("Research and plan only mode is active, marking agent for exit.")
+        mark_should_exit(propagation_depth=1)
+
+
 @tool("emit_plan")
 def emit_plan(plan: str) -> str:
     """
@@ -56,53 +112,32 @@ def emit_plan(plan: str) -> str:
     Returns:
         A confirmation message indicating the plan was stored.
     """
-    from ra_aid.database.repositories.config_repository import get_config_repository
-    config_repo = get_config_repository()
-    if config_repo.get("research_and_plan_only", False):
-        if not have_research_notes_been_emitted():
-            return "Error: You must call `emit_research_notes` at least once before calling `emit_plan` when in --research-and-plan-only mode. Please emit your research notes first."
-    
+    precondition_error = _check_emit_plan_preconditions()
+    if precondition_error:
+        return precondition_error
+
     try:
-        session_repo = get_session_repository()
-        session_record = session_repo.get_current_session_record()
-
-        if session_record:
-            session_record.plan = plan
-            session_record.save()
-
-            log_work_event("Stored implementation plan.")
-
-            # Record to trajectory
-            try:
-                human_input_id = get_human_input_repository().get_most_recent_id()
-                get_trajectory_repository().create(
-                    tool_name="emit_plan",
-                    tool_parameters={"plan": plan},
-                    step_data={
-                        "display_title": "Plan Stored",
-                        "plan_length": len(plan),
-                    },
-                    record_type="emit_plan",
-                    human_input_id=human_input_id,
-                )
-            except RuntimeError as e:
-                logger.warning(f"Failed to record trajectory for emit_plan: {str(e)}")
-
-            cpm(plan, title="📝 Plan Stored")
-            
-            # Check if we should exit after planning
-            config_repo = get_config_repository()
-            if config_repo.get("research_and_plan_only", False):
-                logger.info("Research and plan only mode is active, marking agent for exit.")
-                mark_should_exit(propagation_depth=1)
-                
-            return "Plan stored successfully."
-        else:
-            logger.error("No active session found to store the plan.")
+        # Attempt to save the plan to the current session.
+        # _save_plan_to_current_session handles getting session, saving plan, and logging work event.
+        # It returns the session_record on success, None if no active session is found (error logged by helper).
+        session_record = _save_plan_to_current_session(plan)
+        
+        if not session_record:
+            # If session_record is None, _save_plan_to_current_session has already logged the specific error.
             return "Error: No active session found."
 
+        # If plan saving was successful, record it in the trajectory.
+        _record_plan_trajectory_entry(plan)
+        
+        # Display the plan to the user and handle any conditional exit logic.
+        _display_plan_and_conditionally_exit(plan)
+        
+        return "Plan stored successfully."
+
     except Exception as e:
-        logger.error(f"Failed to store plan: {str(e)}")
+        # This broad exception handler catches errors from _save_plan_to_current_session (e.g., DB save failure)
+        # or any other unexpected issues during the plan emission process.
+        logger.error(f"Failed to store plan due to an unexpected error: {str(e)}")
         console.print(f"Error storing plan: {str(e)}", style="red")
         return f"Failed to store plan: {str(e)}"
 
@@ -116,79 +151,63 @@ def emit_research_notes(notes: str) -> str:
     Args:
         notes: REQUIRED The research notes to store
     """
-    # Try to get the latest human input
-    human_input_id = None
-    try:
-        human_input_repo = get_human_input_repository()
-        human_input_id = human_input_repo.get_most_recent_id()
-    except RuntimeError as e:
-        logger.warning(f"No HumanInputRepository available: {str(e)}")
-    except Exception as e:
-        logger.warning(f"Failed to get recent human input: {str(e)}")
-    
-    # Get the current session ID
-    session_id = None
-    try:
-        session_repo = get_session_repository()
-        session_record = session_repo.get_current_session_record()
-        if session_record:
-            session_id = session_record.id
-    except RuntimeError as e:
-        logger.warning(f"Could not get session ID for research note: {e}")
+    human_input_id = _get_most_recent_human_input_id()
+    session_id = _get_current_session_id()
+    note_id = None
 
     try:
-        # Create note in database using repository
+        # Create research note
         created_note = get_research_note_repository().create(
             notes, human_input_id=human_input_id, session_id=session_id
         )
         note_id = created_note.id
         
-        # Format the note using the formatter
         from ra_aid.model_formatters.research_notes_formatter import format_research_note
         formatted_note = format_research_note(note_id, notes)
         
-        # Record to trajectory before displaying panel
-        try:
-            trajectory_repo = get_trajectory_repository()
-            trajectory_repo.create(
-                tool_name="emit_research_notes",
-                tool_parameters={"notes": notes},
-                step_data={
-                    "note_id": note_id,
-                    "display_title": "Research Notes",
-                },
-                record_type="emit_research_notes",
-                human_input_id=human_input_id
-            )
-        except RuntimeError as e:
-            logger.warning(f"Failed to record trajectory: {str(e)}")
+        # Record to trajectory
+        trajectory_repo = get_trajectory_repository()
+        trajectory_repo.create(
+            tool_name="emit_research_notes",
+            tool_parameters={"notes": notes},
+            step_data={
+                "note_id": note_id,
+                "display_title": "Research Notes",
+            },
+            record_type="emit_research_notes",
+            human_input_id=human_input_id
+        )
         
-        # Display formatted note
         cpm(formatted_note, title="🔍 Research Notes")
-        
         log_work_event(f"Stored research note #{note_id}.")
-        
-        # Mark research notes as emitted
         mark_research_notes_emitted()
         
-        # Check if we need to clean up notes (more than 30)
-        try:
-            all_notes = get_research_note_repository().get_all()
-            if len(all_notes) > 30:
-                # Trigger the research notes cleaner agent
-                try:
-                    from ra_aid.agents.research_notes_gc_agent import run_research_notes_gc_agent
-                    run_research_notes_gc_agent()
-                except Exception as e:
-                    logger.error(f"Failed to run research notes cleaner: {str(e)}")
-        except RuntimeError as e:
-            logger.error(f"Failed to access research note repository: {str(e)}")
-            
-        return f"Research note #{note_id} stored."
     except RuntimeError as e:
-        logger.error(f"Failed to access research note repository: {str(e)}")
-        console.print(f"Error storing research note: {str(e)}", style="red")
-        return "Failed to store research note."
+        # This catches errors from both create_note and create_trajectory
+        if note_id is not None: # Note was created, but trajectory failed
+            logger.warning(f"Failed to record trajectory for research note #{note_id}: {str(e)}")
+            # Proceed to display and log the note even if trajectory fails
+            cpm(formatted_note, title="🔍 Research Notes")
+            log_work_event(f"Stored research note #{note_id}.")
+            mark_research_notes_emitted()
+        else: # Note creation failed
+            logger.error(f"Failed to access research note repository or record trajectory: {str(e)}")
+            console.print(f"Error storing research note: {str(e)}", style="red")
+            return "Failed to store research note."
+
+    # Check if we need to clean up notes (more than 30) - separate try/except
+    try:
+        all_notes = get_research_note_repository().get_all()
+        if len(all_notes) > 30:
+            try:
+                from ra_aid.agents.research_notes_gc_agent import run_research_notes_gc_agent
+                run_research_notes_gc_agent()
+            except Exception as e:
+                logger.error(f"Failed to run research notes cleaner: {str(e)}")
+    except RuntimeError as e:
+        logger.error(f"Failed to access research note repository for cleanup check: {str(e)}")
+            
+    return f"Research note #{note_id} stored." if note_id else "Failed to store research note."
 
 
 @tool("emit_key_facts")
@@ -200,15 +219,7 @@ def emit_key_facts(facts: List[str]) -> str:
     """
     results = []
     
-    # Try to get the latest human input
-    human_input_id = None
-    try:
-        human_input_repo = get_human_input_repository()
-        human_input_id = human_input_repo.get_most_recent_id()
-    except RuntimeError as e:
-        logger.warning(f"No HumanInputRepository available: {str(e)}")
-    except Exception as e:
-        logger.warning(f"Failed to get recent human input: {str(e)}")
+    human_input_id = _get_most_recent_human_input_id()
     
     for fact in facts:
         try:
@@ -290,15 +301,7 @@ def emit_key_snippet(snippet_info: SnippetInfo) -> str:
     # Add filepath to related files
     emit_related_files.invoke({"files": [snippet_info["filepath"]]})
 
-    # Try to get the latest human input
-    human_input_id = None
-    try:
-        human_input_repo = get_human_input_repository()
-        human_input_id = human_input_repo.get_most_recent_id()
-    except RuntimeError as e:
-        logger.warning(f"No HumanInputRepository available: {str(e)}")
-    except Exception as e:
-        logger.warning(f"Failed to get recent human input: {str(e)}")
+    human_input_id = _get_most_recent_human_input_id()
 
     # Create a new key snippet in the database
     key_snippet = get_key_snippet_repository().create(
@@ -681,6 +684,30 @@ def reset_work_log() -> str:
     except RuntimeError as e:
         logger.error(f"Failed to access work log repository: {str(e)}")
         return f"Failed to clear work log: {str(e)}"
+
+
+def _get_current_session_id() -> Optional[int]:
+    """Helper function to get the current session ID."""
+    try:
+        session_repo = get_session_repository()
+        session_record = session_repo.get_current_session_record()
+        if session_record:
+            return session_record.id
+    except RuntimeError as e:
+        logger.warning(f"Could not get current session ID: {e}")
+    return None
+
+
+def _get_most_recent_human_input_id() -> Optional[int]:
+    """Helper function to get the most recent human input ID."""
+    try:
+        human_input_repo = get_human_input_repository()
+        return human_input_repo.get_most_recent_id()
+    except RuntimeError as e:
+        logger.warning(f"No HumanInputRepository available: {str(e)}")
+    except Exception as e:
+        logger.warning(f"Failed to get recent human input: {str(e)}")
+    return None
 
 
 @tool("deregister_related_files")
