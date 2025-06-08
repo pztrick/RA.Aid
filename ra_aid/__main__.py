@@ -1599,7 +1599,11 @@ def main():
                 if args.research_and_plan_only:
                     # If this flag is active, the research agent is expected to handle
                     # the plan creation and emission. We exit after research.
-                    print_stage_header("Research phase complete. Plan and notes saved. Exiting as per --research-and-plan-only.")
+                    print_stage_header(
+                        "Research phase complete. Plan and notes saved. Exiting as per --research-and-plan-only.\n"
+                        "You can extract the plan using 'ra-aid extract-last-plan' "
+                        "and research notes using 'ra-aid extract-last-research-notes'."
+                    )
                     sys.exit(0)
 
                 # for how long have we had a second planning agent triggered here?
