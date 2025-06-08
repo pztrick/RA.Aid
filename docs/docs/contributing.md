@@ -90,7 +90,7 @@ yarn dev  # hosts web app on 5173 (default) targeting backend on 1818
 ```
 
 ## Migrations
-ra_aid/database/MIGRATIONS.md
+See `ra_aid/database/MIGRATIONS.md` for reference on how to run migrations.
 
 ## This is Your Project Too
 

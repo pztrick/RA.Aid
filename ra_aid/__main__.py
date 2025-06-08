@@ -844,11 +844,14 @@ def handle_migrate(args):
     # ensure_migrations_applied should be called within a DatabaseManager context
     # that is initialized with args.project_state_dir
     with DatabaseManager(base_dir=args.project_state_dir):
-        success = ensure_migrations_applied()
+        success, error_message = ensure_migrations_applied()
     if success:
         console.print("[bold green]Migrations applied successfully (or no pending migrations).[/bold green]")
     else:
-        console.print("[bold red]Failed to apply migrations.[/bold red]")
+        if error_message:
+            console.print(f"[bold red]Failed to apply migrations.[/bold red]\nDetails: {error_message}")
+        else:
+            console.print("[bold red]Failed to apply migrations. No specific error detail provided.[/bold red]")
         sys.exit(1)
     sys.exit(0)
 
@@ -1153,13 +1156,13 @@ def main():
         with DatabaseManager(base_dir=args.project_state_dir) as db:
             # Apply any pending database migrations
             try:
-                migration_result = ensure_migrations_applied()
-                if not migration_result:
+                migration_success, migration_error_msg = ensure_migrations_applied()
+                if not migration_success:
                     logger.warning(
-                        "Database migrations failed but execution will continue"
+                        f"Database migrations failed but execution will continue. Error: {migration_error_msg or 'No specific error detail provided.'}"
                     )
             except Exception as e:
-                logger.error(f"Database migration error: {str(e)}")
+                logger.error(f"Unexpected database migration error: {str(e)}")
 
             # Initialize empty config dictionary to be populated later
             config = {}
