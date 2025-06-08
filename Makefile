@@ -104,15 +104,15 @@ fix-basic:
 
 migrate-create:
 	@echo "--> Creating migration: $(name)"
-	$(VENV_PYTHON) -m ra_aid.scripts.run_migrations create $(name)
+	$(VENV_PYTHON) -m ra_aid create-migration $(name)
 
 migrate:
 	@echo "--> Running database migrations..."
-	$(VENV_PYTHON) -m ra_aid.scripts.run_migrations migrate
+	$(VENV_PYTHON) -m ra_aid migrate
 
 migrate-status:
 	@echo "--> Checking migration status..."
-	$(VENV_PYTHON) -m ra_aid.scripts.run_migrations status
+	$(VENV_PYTHON) -m ra_aid migration-status
 
 
 # ====================================================================================
@@ -120,25 +120,23 @@ migrate-status:
 # ====================================================================================
 
 extract-last-plan:
-	@.venv/bin/python -m ra_aid.scripts.extract_last_plan
+	@$(VENV_PYTHON) -m ra_aid extract-last-plan
 
 extract-last-research-notes:
-	@.venv/bin/python -m ra_aid.scripts.extract_last_research_notes
-
+	@$(VENV_PYTHON) -m ra_aid extract-last-research-notes
 
 last-cost:
-	$(VENV_PYTHON) ra_aid/scripts/cli.py latest
+	$(VENV_PYTHON) -m ra_aid last-cost
 
 all-costs:
-	$(VENV_PYTHON) ra_aid/scripts/cli.py all
+	$(VENV_PYTHON) -m ra_aid all-costs
 
 extract-plan:
 	@if [ -z "$(session_id)" ]; then \
-		echo "Error: session_id is not set."; \
-		echo "Usage: make extract-plan session_id=<id>"; \
-		exit 1; \
+		$(VENV_PYTHON) -m ra_aid extract-plan; \
+	else \
+		$(VENV_PYTHON) -m ra_aid extract-plan $(session_id); \
 	fi
-	$(VENV_PYTHON) ra_aid/scripts/cli.py extract-plan $(session_id)
 
 
 

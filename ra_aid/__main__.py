@@ -286,15 +286,51 @@ def parse_arguments(args=None):
         return value
 
     parser = argparse.ArgumentParser(
-        description="RA.Aid - AI Agent for executing programming and research tasks",
+        description="RA.Aid - AI Agent for executing programming and research tasks.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-    ra-aid -m "Add error handling to the database module"
-    ra-aid -m "Explain the authentication flow" --research-only
-    ra-aid --msg-file task_description.txt
-        """,
+        # Epilog will be added after subparsers are defined
     )
+
+    # Global arguments (relevant for agent/server modes and some script commands)
+    parser.add_argument(
+        "--project-state-dir",
+        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
+    )
+    parser.add_argument(
+        "--log-mode",
+        choices=["console", "file"],
+        default="file",
+        help="Logging mode: 'console' shows all logs in console, 'file' logs to file with only warnings+ in console (default: file)",
+    )
+    parser.add_argument(
+        "--pretty-logger", action="store_true", help="Enable pretty logging output"
+    )
+    parser.add_argument(
+        "--log-level",
+        type=log_level_type,
+        default="debug",
+        help="Set specific logging level (case-insensitive, affects file and console logging based on --log-mode, default: debug)",
+    )
+    # Version argument needs to be accessible early
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Show program version number and exit",
+    )
+
+    subparsers = parser.add_subparsers(title="Commands", dest="command", help="Available commands. Use <command> --help for specific command help.")
+    subparsers.required = False # Make command optional for default agent behavior
+
+    # Agent/Server related arguments (will be grouped or handled if no script command is given)
+    # These are defined here so they appear in the main help, but primarily used when no script subcommand is chosen.
+    # Alternatively, they could be added to a "run" or "agent" subcommand. For now, keep them global.
+
+    agent_parser = subparsers.add_parser("agent", help="Run the AI agent (default if no command is specified).", add_help=False) # add_help=False to avoid conflict with main parser's args
+
+    # Arguments for the main agent functionality (original parser arguments)
+    # These are added to the main parser so they can be used if no subcommand is given,
+    # or potentially passed to an "agent" subcommand in the future.
     parser.add_argument(
         "-m",
         "--message",
@@ -306,12 +342,7 @@ Examples:
         type=str,
         help="Path to a text file containing the task/message (cannot be used with --message)",
     )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-        help="Show program version number and exit",
-    )
+    # Removed redundant --version argument here, it's already defined globally.
     parser.add_argument(
         "--research-only",
         action="store_true",
@@ -395,21 +426,6 @@ Examples:
         help="Enable chat mode with direct human interaction (implies --hil)",
     )
     parser.add_argument(
-        "--log-mode",
-        choices=["console", "file"],
-        default="file",
-        help="Logging mode: 'console' shows all logs in console, 'file' logs to file with only warnings+ in console",
-    )
-    parser.add_argument(
-        "--pretty-logger", action="store_true", help="Enable pretty logging output"
-    )
-    parser.add_argument(
-        "--log-level",
-        type=log_level_type,
-        default="debug",
-        help="Set specific logging level (case-insensitive, affects file and console logging based on --log-mode)",
-    )
-    parser.add_argument(
         "--temperature",
         type=float,
         help="LLM temperature (0.0-2.0). Controls randomness in responses",
@@ -483,10 +499,7 @@ Examples:
         action="store_true",
         help="Delete the project database file (.ra-aid/pk.db) before starting, effectively wiping all stored memory",
     )
-    parser.add_argument(
-        "--project-state-dir",
-        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
-    )
+    # Removed redundant --project-state-dir argument here, it's already defined globally.
     parser.add_argument(
         "--show-thoughts",
         action="store_true",
@@ -552,79 +565,152 @@ Examples:
         type=str,
         help="Set the default model to use for future runs",
     )
+
+    # --- Script Subcommands ---
+
+    # last-cost
+    parser_last_cost = subparsers.add_parser("last-cost", help="Display cost and token usage for the latest session.")
+    # --project-state-dir is global
+
+    # all-costs
+    parser_all_costs = subparsers.add_parser("all-costs", help="Display cost and token usage for all sessions.")
+    # --project-state-dir is global
+
+    # extract-plan
+    parser_extract_plan = subparsers.add_parser("extract-plan", help="Extract the plan for a session. Defaults to the latest session.")
+    parser_extract_plan.add_argument("session_id", type=int, nargs='?', default=None, help="The ID of the session. If omitted, the latest session is used.")
+    # --project-state-dir is global
+
+    # extract-last-plan
+    parser_extract_last_plan = subparsers.add_parser("extract-last-plan", help="Extract the plan for the most recent session.")
+    # --project-state-dir is global
+
+    # extract-last-research-notes
+    parser_extract_last_research_notes = subparsers.add_parser("extract-last-research-notes", help="Extract research notes for the most recent session.")
+    # --project-state-dir is global
+    
+    # generate-openapi
+    parser_generate_openapi = subparsers.add_parser("generate-openapi", help="Generate and print the OpenAPI specification for the server.")
+
+    # create-migration
+    parser_create_migration = subparsers.add_parser("create-migration", help="Create a new database migration.")
+    parser_create_migration.add_argument("name", type=str, help="Name for the new migration (e.g., add_user_table).")
+    # --project-state-dir is global
+
+    # migrate
+    parser_migrate = subparsers.add_parser("migrate", help="Run all pending database migrations.")
+    # --project-state-dir is global
+
+    # migration-status
+    parser_migration_status = subparsers.add_parser("migration-status", help="Show the current status of database migrations.")
+    # --project-state_dir is global
+
+    # extract-changelog
+    parser_extract_changelog = subparsers.add_parser("extract-changelog", help="Extract changelog entries for a specific version from CHANGELOG.md.")
+    parser_extract_changelog.add_argument("version", type=str, help="The version string to extract (e.g., 0.30.0).")
+
+    # Update epilog with examples including new subcommands
+    parser.epilog = """
+Examples:
+  ra-aid -m "Add error handling to the database module"
+  ra-aid --server
+  ra-aid last-cost
+  ra-aid extract-plan 123
+  ra-aid create-migration add_new_feature
+  ra-aid extract-changelog 0.25.0
+    """
+
     if args is None:
         args = sys.argv[1:]
+    
+    # If only 'ra-aid' is run with no subcommand or message, it should show help or default to agent.
+    # For now, parse_args will handle if a command is required or not.
+    # If sys.argv is just the program name, args will be empty.
+    # If first arg is not a recognized command or option, it might be treated as agent message if -m is not used.
+    # This needs careful handling if we want `ra-aid "my task"` to work without -m.
+    # Current setup: `ra-aid -m "task"` or `ra-aid <subcommand>`.
+
     parsed_args = parser.parse_args(args)
 
-    # Validate message vs msg-file usage
-    if parsed_args.message and parsed_args.msg_file:
-        parser.error("Cannot use both --message and --msg-file")
-    if parsed_args.msg_file:
-        try:
-            with open(parsed_args.msg_file, "r") as f:
-                parsed_args.message = f.read()
-        except IOError as e:
-            parser.error(f"Failed to read message file: {str(e)}")
+    # If no command is specified, and no message/server/wipe flag, show help.
+    # However, the default behavior is to run the agent.
+    # We'll check `parsed_args.command` later to dispatch.
 
-    # Set hil=True when chat mode is enabled
-    if parsed_args.chat:
-        parsed_args.hil = True
+    # Validate message vs msg-file usage (only if not a script command that ignores messages)
+    if not parsed_args.command or parsed_args.command not in [
+        "last-cost", "all-costs", "extract-plan", "extract-last-plan", 
+        "extract-last-research-notes", "generate-openapi", "create-migration", 
+        "migrate", "migration-status", "extract-changelog"
+    ]:
+        if parsed_args.message and parsed_args.msg_file:
+            parser.error("Cannot use both --message and --msg-file")
+        if parsed_args.msg_file:
+            try:
+                with open(parsed_args.msg_file, "r") as f:
+                    parsed_args.message = f.read()
+            except IOError as e:
+                parser.error(f"Failed to read message file: {str(e)}")
 
-    # Validate provider
-    if parsed_args.provider not in VALID_PROVIDERS:
-        parser.error(f"Invalid provider: {parsed_args.provider}")
-    # Handle model defaults and requirements
+        # Set hil=True when chat mode is enabled
+        if parsed_args.chat:
+            parsed_args.hil = True
 
-    if parsed_args.provider == "openai":
-        parsed_args.model = parsed_args.model or DEFAULT_OPENAI_MODEL
-    elif parsed_args.provider == "anthropic":
-        # Use default model for Anthropic only if not specified
-        parsed_args.model = parsed_args.model or DEFAULT_ANTHROPIC_MODEL
-    elif parsed_args.provider == "gemini":
-        parsed_args.model = parsed_args.model or DEFAULT_GEMINI_MODEL
-    elif not parsed_args.model and not parsed_args.research_only:
-        # Require model for other providers unless in research mode
-        parser.error(
-            f"--model is required when using provider '{parsed_args.provider}'"
-        )
+        # Validate provider
+        if parsed_args.provider not in VALID_PROVIDERS:
+            parser.error(f"Invalid provider: {parsed_args.provider}")
+        # Handle model defaults and requirements
 
-    # Handle expert provider/model defaults
-    if not parsed_args.expert_provider:
-        # Priority: Explicit EXPERT_* -> Both Gemini/OpenAI -> Gemini -> Anthropic Expert -> DeepSeek -> Main Provider Fallback
-        if os.environ.get("EXPERT_OPENAI_API_KEY"):
-            parsed_args.expert_provider = "openai"
-            parsed_args.expert_model = None  # Will be auto-selected later
-        elif os.environ.get("EXPERT_ANTHROPIC_API_KEY"):
-             parsed_args.expert_provider = "anthropic"
-             # Use main anthropic model if expert model not specified
-             parsed_args.expert_model = parsed_args.expert_model or DEFAULT_EXPERT_ANTHROPIC_MODEL
-        # Add other explicit EXPERT_* checks here if needed in the future...
+        if parsed_args.provider == "openai":
+            parsed_args.model = parsed_args.model or DEFAULT_OPENAI_MODEL
+        elif parsed_args.provider == "anthropic":
+            # Use default model for Anthropic only if not specified
+            parsed_args.model = parsed_args.model or DEFAULT_ANTHROPIC_MODEL
+        elif parsed_args.provider == "gemini":
+            parsed_args.model = parsed_args.model or DEFAULT_GEMINI_MODEL
+        elif not parsed_args.model and not parsed_args.research_only:
+            # Require model for other providers unless in research mode
+            if not hasattr(parsed_args, 'command') or parsed_args.command is None or parsed_args.command == "agent":
+                 parser.error(
+                    f"--model is required when using provider '{parsed_args.provider}'"
+                )
 
-        # NEW: Check if both base Gemini and OpenAI keys are present (and no specific EXPERT_* key was found)
-        elif os.environ.get("GEMINI_API_KEY") and os.environ.get("OPENAI_API_KEY"):
-            # Both keys present, default main to Gemini (already done) and expert to OpenAI
-            parsed_args.expert_provider = "openai"
-            # Let llm.py auto-select 'o3' unless user specified --expert-model
-            parsed_args.expert_model = parsed_args.expert_model or None
-
-        # Fallback checks for individual base keys (if the combined check didn't match or only one key exists)
-        elif os.environ.get("GEMINI_API_KEY"): # Check main Gemini key as fallback
-            parsed_args.expert_provider = "gemini"
-            # Use default Gemini model if not specified
-            parsed_args.expert_model = parsed_args.expert_model or DEFAULT_EXPERT_GEMINI_MODEL
-        elif os.environ.get("DEEPSEEK_API_KEY"): # Check main Deepseek key as fallback
-            parsed_args.expert_provider = "deepseek"
-            parsed_args.expert_model = DEFAULT_EXPERT_DEEPSEEK_MODEL # Specific default for Deepseek expert
-        else:
-            # Final Fallback: Use main provider settings if none of the above conditions met
-            # Special-case OpenAI main provider: we want to use the provider but let later logic choose the best expert model.
-            if parsed_args.provider == "openai":
+        # Handle expert provider/model defaults
+        if not parsed_args.expert_provider:
+            # Priority: Explicit EXPERT_* -> Both Gemini/OpenAI -> Gemini -> Anthropic Expert -> DeepSeek -> Main Provider Fallback
+            if os.environ.get("EXPERT_OPENAI_API_KEY"):
                 parsed_args.expert_provider = "openai"
-                parsed_args.expert_model = None  # trigger auto-selection later (prefer o3)
+                parsed_args.expert_model = None  # Will be auto-selected later
+            elif os.environ.get("EXPERT_ANTHROPIC_API_KEY"):
+                parsed_args.expert_provider = "anthropic"
+                # Use main anthropic model if expert model not specified
+                parsed_args.expert_model = parsed_args.expert_model or DEFAULT_EXPERT_ANTHROPIC_MODEL
+            # Add other explicit EXPERT_* checks here if needed in the future...
+
+            # NEW: Check if both base Gemini and OpenAI keys are present (and no specific EXPERT_* key was found)
+            elif os.environ.get("GEMINI_API_KEY") and os.environ.get("OPENAI_API_KEY"):
+                # Both keys present, default main to Gemini (already done) and expert to OpenAI
+                parsed_args.expert_provider = "openai"
+                # Let llm.py auto-select 'o3' unless user specified --expert-model
+                parsed_args.expert_model = parsed_args.expert_model or None
+
+            # Fallback checks for individual base keys (if the combined check didn't match or only one key exists)
+            elif os.environ.get("GEMINI_API_KEY"): # Check main Gemini key as fallback
+                parsed_args.expert_provider = "gemini"
+                # Use default Gemini model if not specified
+                parsed_args.expert_model = parsed_args.expert_model or DEFAULT_EXPERT_GEMINI_MODEL
+            elif os.environ.get("DEEPSEEK_API_KEY"): # Check main Deepseek key as fallback
+                parsed_args.expert_provider = "deepseek"
+                parsed_args.expert_model = DEFAULT_EXPERT_DEEPSEEK_MODEL # Specific default for Deepseek expert
             else:
-                # For other main providers, use their settings as the expert fallback
-                parsed_args.expert_provider = parsed_args.provider
-                parsed_args.expert_model = parsed_args.model
+                # Final Fallback: Use main provider settings if none of the above conditions met
+                # Special-case OpenAI main provider: we want to use the provider but let later logic choose the best expert model.
+                if parsed_args.provider == "openai":
+                    parsed_args.expert_provider = "openai"
+                    parsed_args.expert_model = None  # trigger auto-selection later (prefer o3)
+                else:
+                    # For other main providers, use their settings as the expert fallback
+                    parsed_args.expert_provider = parsed_args.provider
+                    parsed_args.expert_model = parsed_args.model
 
     # Validate temperature range if provided
     if parsed_args.temperature is not None and not (
@@ -655,8 +741,177 @@ Examples:
     return parsed_args
 
 
-# Create console instance
+# Create console instance (global for the module)
 console = Console()
+
+# --- Handler functions for script subcommands ---
+# Note: These will be defined before `main()` uses them.
+
+def handle_last_cost(args):
+    import json
+    from ra_aid.scripts.last_session_usage import get_latest_session_usage
+    result, status_code = get_latest_session_usage(
+        project_dir=args.project_state_dir, 
+        db_path=None # db_path is not exposed as a direct CLI arg for subcommands yet
+    )
+    console.print(json.dumps(result, indent=2))
+    sys.exit(status_code)
+
+def handle_all_costs(args):
+    import json
+    from ra_aid.scripts.all_sessions_usage import get_all_sessions_usage
+    results, status_code = get_all_sessions_usage(
+        project_dir=args.project_state_dir,
+        db_path=None 
+    )
+    console.print(json.dumps(results, indent=2))
+    sys.exit(status_code)
+
+def handle_extract_plan(args):
+    from ra_aid.scripts.extract_plan import get_plan_for_session
+    from ra_aid.scripts.extract_last_plan import main as extract_last_plan_main
+    
+    if args.session_id is not None:
+        plan = get_plan_for_session(args.session_id, project_state_dir=args.project_state_dir)
+        if plan:
+            console.print(f"Plan for session {args.session_id}:")
+            console.print(plan)
+        else:
+            console.print(f"No plan found for session {args.session_id}.")
+    else:
+        # No session_id provided, use extract_last_plan logic
+        extract_last_plan_main(project_state_dir=args.project_state_dir)
+    sys.exit(0)
+
+def handle_extract_last_plan(args):
+    from ra_aid.scripts.extract_last_plan import main as extract_last_plan_main
+    extract_last_plan_main(project_state_dir=args.project_state_dir)
+    sys.exit(0)
+
+def handle_extract_last_research_notes(args):
+    from ra_aid.scripts.extract_last_research_notes import main as extract_last_research_notes_main
+    extract_last_research_notes_main(project_state_dir=args.project_state_dir)
+    sys.exit(0)
+
+def handle_generate_openapi(args):
+    from ra_aid.scripts.generate_openapi import main as generate_openapi_main
+    generate_openapi_main() # This script prints to stdout
+    sys.exit(0)
+
+def handle_create_migration(args):
+    from ra_aid.database.migrations import create_new_migration
+    # Ensure DB context for migration path resolution if needed, though create_new_migration might handle paths independently
+    # For safety, operations that might implicitly init DBManager should be aware of project_state_dir
+    # However, create_new_migration primarily deals with file system paths based on project structure.
+    # It might be fine without a full DBManager context if it resolves paths correctly.
+    # Let's assume it works correctly with current project path detection or add chdir if problems arise.
+    # The `get_migrations_dir` used by `create_new_migration` should ideally respect `project_state_dir`.
+    # This is a deeper refactor. For now, we call it directly.
+    # If `project_state_dir` is set, `create_new_migration` needs to know where `.ra-aid/migrations` should be.
+    # This might require `create_new_migration` to accept `base_dir`.
+    # For now, we assume it uses cwd correctly or that `project_state_dir` is handled by underlying path functions.
+    
+    console.print(f"Creating migration: [cyan]{args.name}[/cyan]")
+    # `create_new_migration` needs to be aware of `project_state_dir` if it's not the CWD.
+    # This is a limitation if `create_new_migration` doesn't take `base_dir`.
+    # A temporary workaround could be `os.chdir` if `args.project_state_dir` is set.
+    original_cwd = None
+    if args.project_state_dir and os.getcwd() != os.path.abspath(args.project_state_dir):
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(args.project_state_dir)
+            logger.info(f"Changed CWD to {args.project_state_dir} for migration creation.")
+        except FileNotFoundError:
+            console.print(f"[bold red]Error:[/bold red] Project state directory not found: {args.project_state_dir}")
+            sys.exit(1)
+            
+    result = create_new_migration(args.name, auto=True)
+
+    if original_cwd:
+        os.chdir(original_cwd)
+        logger.info(f"Restored CWD to {original_cwd}.")
+
+    if result:
+        console.print(f"[bold green]Successfully created migration:[/bold green] {result}")
+    else:
+        console.print("[bold red]Failed to create migration.[/bold red]")
+        sys.exit(1)
+    sys.exit(0)
+
+def handle_migrate(args):
+    from ra_aid.database.migrations import ensure_migrations_applied
+    console.print("Applying pending migrations...")
+    # ensure_migrations_applied should be called within a DatabaseManager context
+    # that is initialized with args.project_state_dir
+    with DatabaseManager(base_dir=args.project_state_dir):
+        success = ensure_migrations_applied()
+    if success:
+        console.print("[bold green]Migrations applied successfully (or no pending migrations).[/bold green]")
+    else:
+        console.print("[bold red]Failed to apply migrations.[/bold red]")
+        sys.exit(1)
+    sys.exit(0)
+
+def handle_migration_status(args):
+    from ra_aid.database.migrations import get_migration_status
+    from rich.table import Table as RichTable # Alias to avoid conflict with other Table types
+
+    console.print("Checking migration status...")
+    with DatabaseManager(base_dir=args.project_state_dir):
+        status = get_migration_status()
+    
+    if "error" in status:
+        console.print(f"[bold red]Error getting status:[/bold red] {status['error']}")
+        sys.exit(1)
+
+    table = RichTable(title="Migration Status")
+    table.add_column("Status", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Count", justify="left", style="magenta")
+    table.add_row("Applied", str(status.get("applied_count", 0)))
+    table.add_row("Pending", str(status.get("pending_count", 0)))
+    console.print(table)
+
+    if status.get("pending"):
+        console.print("\n[bold yellow]Pending Migrations:[/bold yellow]")
+        for p in status["pending"]:
+            console.print(f"- {p}")
+    sys.exit(0)
+
+def handle_extract_changelog(args):
+    from ra_aid.scripts.extract_changelog import extract_version_content # Use the core function
+    from pathlib import Path
+
+    version = args.version
+    # CHANGELOG.md is assumed to be in project root, 3 levels up from __main__.py's script dir
+    # This path logic might need adjustment if ra-aid is installed as a package.
+    # For development: Path(__file__).parent.parent.parent / "CHANGELOG.md"
+    # For installed package: This needs a robust way to find CHANGELOG.md relative to package or CWD.
+    # Assuming CWD for now if run from project root.
+    changelog_path = Path("CHANGELOG.md") # Simpler assumption, user runs from project root
+    if not changelog_path.exists():
+        # Try relative to __file__ as a fallback (might work in some editable installs)
+        script_dir_changelog_path = Path(__file__).resolve().parents[2] / "CHANGELOG.md"
+        if script_dir_changelog_path.exists():
+            changelog_path = script_dir_changelog_path
+        else:
+            console.print(f"Error: Could not find {changelog_path} or {script_dir_changelog_path}", file=sys.stderr)
+            sys.exit(1)
+            
+    try:
+        content = changelog_path.read_text()
+        version_content = extract_version_content(content, version)
+        console.print(version_content)
+    except FileNotFoundError:
+        console.print(f"Error: Could not find {changelog_path}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as e: # Raised by extract_version_content if version not found
+        console.print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"Error reading changelog or extracting content: {e}", file=sys.stderr)
+        sys.exit(1)
+    sys.exit(0)
+
 
 # Create individual memory objects for each agent
 research_memory = MemorySaver()
@@ -812,16 +1067,48 @@ def build_status():
 
 def main():
     """Main entry point for the ra-aid command line tool."""
-    args = parse_arguments()
+    args = parse_arguments() # This now parses global args and subcommands
+
+    # Setup logging early. project_state_dir is a global arg.
     setup_logging(
         args.log_mode,
         args.pretty_logger,
         args.log_level,
-        base_dir=args.project_state_dir,
+        base_dir=args.project_state_dir, # Pass explicitly
     )
     logger.debug("Starting RA.Aid with arguments: %s", args)
 
-    # Check if we need to set default provider or model
+    # Dispatch to subcommand handlers if a command is given
+    if args.command:
+        if args.command == "last-cost":
+            handle_last_cost(args)
+        elif args.command == "all-costs":
+            handle_all_costs(args)
+        elif args.command == "extract-plan":
+            handle_extract_plan(args)
+        elif args.command == "extract-last-plan":
+            handle_extract_last_plan(args)
+        elif args.command == "extract-last-research-notes":
+            handle_extract_last_research_notes(args)
+        elif args.command == "generate-openapi":
+            handle_generate_openapi(args)
+        elif args.command == "create-migration":
+            handle_create_migration(args)
+        elif args.command == "migrate":
+            handle_migrate(args)
+        elif args.command == "migration-status":
+            handle_migration_status(args)
+        elif args.command == "extract-changelog":
+            handle_extract_changelog(args)
+        # Add other command dispatches here
+        # If a command was handled, the handler function should sys.exit()
+        # If we reach here after a command, it means it wasn't a script command or didn't exit.
+        # This part might need refinement based on how subcommands are structured.
+        # For now, assuming script handlers exit. Agent/server logic follows.
+        # If args.command was "agent", it will fall through.
+
+    # If no specific script-like command was run and exited, proceed with agent/server logic.
+    # Check if we need to set default provider or model (this is a global option, not a subcommand)
     from ra_aid.config import save_default_values
 
     if args.set_default_provider or args.set_default_model:
@@ -1153,7 +1440,7 @@ def main():
                 if (
                     not args.message and not args.wipe_project_memory
                 ):  # Add check for wipe_project_memory flag
-                    error_message = "--message or --msg-file is required"
+                    error_message = "--message or --msg-file is required. Use --help for available commands."
                     try:
                         trajectory_repo = get_trajectory_repository()
                         human_input_id = (
@@ -1309,7 +1596,7 @@ def main():
                 if args.research_and_plan_only:
                     # If this flag is active, the research agent is expected to handle
                     # the plan creation and emission. We exit after research.
-                    print_stage_header("Research phase complete. Plan (if generated by research agent) and notes saved. Exiting as per --research-and-plan-only.")
+                    print_stage_header("Research phase complete. Plan and notes saved. Exiting as per --research-and-plan-only.")
                     sys.exit(0)
 
                 # for how long have we had a second planning agent triggered here?

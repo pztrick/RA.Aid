@@ -73,7 +73,6 @@ dev = [
 
 [project.scripts]
 ra-aid = "ra_aid.__main__:main"
-ra-aid-cli = "ra_aid.scripts.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/ai-christianson/RA.Aid"

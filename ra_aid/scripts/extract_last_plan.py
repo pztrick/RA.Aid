@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add project root to the Python path
 # This is necessary for the script to be runnable directly
@@ -11,11 +12,11 @@ from ra_aid.database.connection import DatabaseManager
 from ra_aid.database.repositories.session_repository import SessionRepositoryManager
 
 
-def main():
+def main(project_state_dir: Optional[str] = None):
     """
     Extracts the plan from the latest session and prints it to standard output.
     """
-    db_manager = DatabaseManager()
+    db_manager = DatabaseManager(base_dir=project_state_dir)
     with db_manager as db:
         with SessionRepositoryManager(db) as repo:
             # get_latest_session() is suitable here as it fetches the most
