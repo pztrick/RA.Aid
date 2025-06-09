@@ -57,7 +57,10 @@ from ra_aid.logging_config import get_logger
 from ra_aid.models_params import (
     DEFAULT_TOKEN_LIMIT,
 )
-from ra_aid.utils.agent_thread_manager import agent_thread_registry, has_received_stop_signal
+from ra_aid.utils.agent_thread_manager import (
+    agent_thread_registry,
+    has_received_stop_signal,
+)
 from ra_aid.tools.handle_user_defined_test_cmd_execution import execute_test_command
 from ra_aid.database.repositories.human_input_repository import (
     get_human_input_repository,
@@ -71,7 +74,6 @@ from ra_aid.anthropic_token_limiter import (
     state_modifier,
     get_model_token_limit,
 )
-
 
 logger = get_logger(__name__)
 
@@ -108,7 +110,13 @@ def build_agent_kwargs(
 
             if any(
                 pattern in model_name
-                for pattern in ["claude-3.7", "claude3.7", "claude-3-7"]
+                for pattern in [
+                    "claude-3.7",
+                    "claude3.7",
+                    "claude-3-7",
+                    "claude-4",
+                    "claude-sonnet-4",
+                ]
             ):
                 return state_modifier(state, model, max_input_tokens=max_input_tokens)
 
@@ -189,7 +197,13 @@ def create_agent(
         else:
             cpm("Using CIAYN Agent")
             logger.debug("Using CiaynAgent agent instance based on model capabilities.")
-            return CiaynAgent(model, tools, max_tokens=max_input_tokens, config=config, session_id=session_id)
+            return CiaynAgent(
+                model,
+                tools,
+                max_tokens=max_input_tokens,
+                config=config,
+                session_id=session_id,
+            )
 
     except Exception as e:
         # Default to REACT agent if provider/model detection fails
@@ -329,7 +343,7 @@ def _handle_api_error(e, attempt, max_retries, base_delay):
     # Change log level to info
     logger.info("API error (attempt %d/%d): %s", attempt + 1, max_retries, str(e))
     delay = base_delay * (2**attempt)
-    error_message = f"Encountered {e.__class__.__name__}: {e}. Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})"
+    error_message = f"Encountered {e.__class__.__name__}: {e}. Retrying in {delay}s... (Attempt {attempt + 1}/{max_retries})"
 
     trajectory_repo = get_trajectory_repository()
     human_input_id = get_human_input_repository().get_most_recent_id()
@@ -495,7 +509,9 @@ def _get_agent_state(agent: RAgents, state_config: Dict[str, Any]):
         raise
 
 
-def _run_agent_stream(agent: RAgents, msg_list: list[BaseMessage], session_id: Optional[int] = None) -> bool:
+def _run_agent_stream(
+    agent: RAgents, msg_list: list[BaseMessage], session_id: Optional[int] = None
+) -> bool:
     """
     Streams agent output while handling completion and interruption.
 
@@ -601,7 +617,9 @@ def run_agent_with_retry(
 
                 # Check if the agent has received a stop signal
                 if has_received_stop_signal(session_id):
-                    logger.debug("Agent received halt signal; stopping not due to error.")
+                    logger.debug(
+                        "Agent received halt signal; stopping not due to error."
+                    )
                     break
 
                 try:

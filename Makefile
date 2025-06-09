@@ -10,7 +10,7 @@ VENV_RUFF := $(VENV)/bin/ruff
 VENV_PRE_COMMIT := $(VENV)/bin/pre-commit
 
 # Phony targets - list all targets that are not files
-.PHONY: all-costs check clean extract-plan extract-last-plan extract-last-research-notes fix fix-basic help last-cost migrate migrate-create migrate-status setup-dev setup-dev-uv setup-hooks test
+.PHONY: all-costs check check-model clean extract-plan extract-last-plan extract-last-research-notes fix fix-basic help last-cost migrate migrate-create migrate-status setup-dev setup-dev-uv setup-hooks test
 
 # ====================================================================================
 # HELP
@@ -35,6 +35,7 @@ help:
 	@echo "    migrate-status            - Show the current status of database migrations"
 	@echo ""
 	@echo "  Application Scripts:"
+	@echo "    check-model model=...     - Check if a model is available via litellm (e.g., make check-model model=gpt-4o)"
 	@echo "    last-cost                 - Display cost and token usage for the latest session"
 	@echo "    all-costs                 - Display cost and token usage for all sessions"
 	@echo "    extract-plan session_id=... - Extract the plan for a given session_id (e.g., make extract-plan session_id=1)"
@@ -118,6 +119,10 @@ migrate-status:
 # ====================================================================================
 # APPLICATION SCRIPTS
 # ====================================================================================
+
+check-model:
+	@echo "--> Checking model: $(or $(model), (default))"
+	@$(VENV_PYTHON) -m ra_aid.scripts.check_model $(model)
 
 extract-last-plan:
 	@$(VENV_PYTHON) -m ra_aid extract-last-plan

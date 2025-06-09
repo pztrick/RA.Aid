@@ -1,6 +1,7 @@
 """Utilities for handling Anthropic-specific message formats and trimming."""
 
 from typing import Callable, List, Literal, Optional, Sequence, Union, cast
+from ra_aid.logging_config import get_logger
 
 from langchain_core.messages import (
     AIMessage,
@@ -11,6 +12,8 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
 )
+
+logger = get_logger(__name__)
 
 
 def _is_message_type(
@@ -96,217 +99,120 @@ def anthropic_trim_messages(
 ) -> List[BaseMessage]:
     """Trim messages to fit within a token limit, with Anthropic-specific handling.
 
-    Warning - not fully implemented - last strategy is supported and test, not
-    allow partial, not 'first' strategy either.
-    This function is similar to langchain_core's trim_messages but with special
-    handling for Anthropic message formats to avoid API errors.
-
-    It always keeps the first num_messages_to_keep messages.
+    This function is designed to be robust for conversations that mix tool calls
+    with regular text messages. It preserves the most recent messages while
+    ensuring that tool call pairs (`AIMessage` + `ToolMessage`) are not broken.
 
     Args:
-        messages: Sequence of messages to trim
-        max_tokens: Maximum number of tokens allowed
-        token_counter: Function to count tokens in messages
-        strategy: Whether to keep the "first" or "last" messages
-        allow_partial: Whether to allow partial messages
-        include_system: Whether to always include the system message
-        start_on: Message type to start on (only for "last" strategy)
+        messages: Sequence of messages to trim.
+        max_tokens: Maximum number of tokens allowed.
+        token_counter: Function to count tokens in messages.
+        strategy: Whether to keep the "first" or "last" messages. Only "last" is robustly supported.
+        num_messages_to_keep: Number of messages to always keep from the start (typically 2 for system prompt and initial user query).
+        allow_partial: Not supported.
+        include_system: If True, the first message is always kept if it's a system message.
+        start_on: Not supported.
 
     Returns:
-        List[BaseMessage]: Trimmed messages that fit within token limit
+        List[BaseMessage]: A list of messages trimmed to fit the token limit.
     """
     if not messages:
         return []
 
-    messages = list(messages)
+    # Check if trimming is needed at all
+    initial_tokens = token_counter(list(messages))
+    if initial_tokens <= max_tokens:
+        return list(messages)
 
-    # Always keep the first num_messages_to_keep messages
+    logger.debug(
+        f"Trimming messages: initial_tokens={initial_tokens}, max_tokens={max_tokens}, messages={len(messages)}"
+    )
+
+    # Adjust num_messages_to_keep to not split a tool pair at the boundary.
+    if (
+        num_messages_to_keep > 0
+        and len(messages) > num_messages_to_keep
+        and is_tool_pair(
+            messages[num_messages_to_keep - 1], messages[num_messages_to_keep]
+        )
+    ):
+        num_messages_to_keep += 1
+
+    # The first messages are always kept.
     kept_messages = messages[:num_messages_to_keep]
     remaining_msgs = messages[num_messages_to_keep:]
 
+    kept_tokens = token_counter(kept_messages)
+    logger.debug(f"Keeping first {len(kept_messages)} messages, tokens={kept_tokens}")
 
-    # For Anthropic, we need to maintain the conversation structure where:
-    # 1. Every AIMessage with tool_use must be followed by a ToolMessage
-    # 2. Every AIMessage that follows a ToolMessage must start with a tool_result
-
-    # First, check if we have any tool_use in the messages
-    has_tool_use_anywhere = any(has_tool_use(msg) for msg in messages)
-
-    # If we have tool_use anywhere, we need to be very careful about trimming
-    if has_tool_use_anywhere:
-        # For safety, just keep all messages if we're under the token limit
-        if token_counter(messages) <= max_tokens:
-            return messages
-
-        # We need to identify all tool_use/tool_result relationships
-        # First, find all AIMessage+ToolMessage pairs
-        pairs = []
-        i = 0
-        while i < len(messages) - 1:
-            if is_tool_pair(messages[i], messages[i + 1]):
-                pairs.append((i, i + 1))
-                i += 2
-            else:
-                i += 1
-
-        # For Anthropic, we need to ensure that:
-        # 1. If we include an AIMessage with tool_use, we must include the following ToolMessage
-        # 2. If we include a ToolMessage, we must include the preceding AIMessage with tool_use
-
-        # The safest approach is to always keep complete AIMessage+ToolMessage pairs together
-        # First, identify all complete pairs
-        complete_pairs = []
-        for start, end in pairs:
-            complete_pairs.append((start, end))
-
-        # Now we'll build our result, starting with the kept_messages
-        # But we need to be careful about the first message if it has tool_use
-        result = []
-
-        # Check if the last message in kept_messages has tool_use
-        if (
-            kept_messages
-            and isinstance(kept_messages[-1], AIMessage)
-            and has_tool_use(kept_messages[-1])
-        ):
-            # We need to find the corresponding ToolMessage
-            for i, (ai_idx, tool_idx) in enumerate(pairs):
-                if messages[ai_idx] is kept_messages[-1]:
-                    # Found the pair, add all kept_messages except the last one
-                    result.extend(kept_messages[:-1])
-                    # Add the AIMessage and ToolMessage as a pair
-                    result.extend([messages[ai_idx], messages[tool_idx]])
-                    # Remove this pair from the list of pairs to process later
-                    pairs = pairs[:i] + pairs[i + 1 :]
-                    break
-            else:
-                # If we didn't find a matching pair, just add all kept_messages
-                result.extend(kept_messages)
-        else:
-            # No tool_use in the last kept message, just add all kept_messages
-            result.extend(kept_messages)
-
-        # If we're using the "last" strategy, we'll try to include pairs from the end
-        if strategy == "last":
-            # First collect all pairs we can include within the token limit
-            pairs_to_include = []
-
-            # Process pairs from the end (newest first)
-            for pair_idx, (ai_idx, tool_idx) in enumerate(reversed(complete_pairs)):
-                # Try adding this pair
-                test_msgs = result.copy()
-
-                # Add all previously selected pairs
-                for prev_ai_idx, prev_tool_idx in pairs_to_include:
-                    test_msgs.extend([messages[prev_ai_idx], messages[prev_tool_idx]])
-
-                # Add this pair
-                test_msgs.extend([messages[ai_idx], messages[tool_idx]])
-
-                if token_counter(test_msgs) <= max_tokens:
-                    # This pair fits, add it to our list
-                    pairs_to_include.append((ai_idx, tool_idx))
-                else:
-                    # This pair would exceed the token limit
-                    break
-
-            # Now add the pairs in the correct order
-            # Sort by index to maintain the original conversation flow
-            pairs_to_include.sort(key=lambda x: x[0])
-            for ai_idx, tool_idx in pairs_to_include:
-                result.extend([messages[ai_idx], messages[tool_idx]])
-
-        # No need to sort - we've already added messages in the correct order
-
-        return result
-
-    # If no tool_use, proceed with normal segmentation
+    # Segment the remaining messages into atomic units.
+    # A segment is either a single message or an AIMessage + ToolMessage pair.
     segments = []
     i = 0
-
-    # Group messages into segments
     while i < len(remaining_msgs):
-        segments.append([remaining_msgs[i]])
-        i += 1
-
-    # Now we have segments that maintain the required structure
-    # We'll add segments from the end (for "last" strategy) or beginning (for "first")
-    # until we hit the token limit
-
-    if strategy == "last":
-        # If we have no segments, just return kept_messages
-        if not segments:
-            return kept_messages
-
-        result = []
-
-        # Process segments from the end
-        for i, segment in enumerate(reversed(segments)):
-            # Try adding this segment
-            test_msgs = segment + result
-
-            if token_counter(kept_messages + test_msgs) <= max_tokens:
-                result = segment + result
-            else:
-                # This segment would exceed the token limit
-                break
-
-        final_result = kept_messages + result
-
-        # For Anthropic, we need to ensure the conversation follows a valid structure
-        # We'll do a final check of the entire conversation
-
-        # Validate the conversation structure
-        valid_result = []
-        i = 0
-
-        # Process messages in order
-        while i < len(final_result):
-            current_msg = final_result[i]
-
-            # If this is an AIMessage with tool_use, it must be followed by a ToolMessage
-            if (
-                i < len(final_result) - 1
-                and isinstance(current_msg, AIMessage)
-                and has_tool_use(current_msg)
-            ):
-                if isinstance(final_result[i + 1], ToolMessage):
-                    # This is a valid tool_use + tool_result pair
-                    valid_result.append(current_msg)
-                    valid_result.append(final_result[i + 1])
-                    i += 2
-                else:
-                    # Invalid: AIMessage with tool_use not followed by ToolMessage
-                    # Skip this message to maintain valid structure
-                    i += 1
-            else:
-                # Regular message, just add it
-                valid_result.append(current_msg)
-                i += 1
-
-        # Final check: don't end with an AIMessage that has tool_use
-        if (
-            valid_result
-            and isinstance(valid_result[-1], AIMessage)
-            and has_tool_use(valid_result[-1])
+        if i + 1 < len(remaining_msgs) and is_tool_pair(
+            remaining_msgs[i], remaining_msgs[i + 1]
         ):
-            valid_result.pop()  # Remove the last message
+            # This is a tool pair, treat it as a single segment.
+            segments.append([remaining_msgs[i], remaining_msgs[i + 1]])
+            i += 2
+        else:
+            # This is a standalone message.
+            segments.append([remaining_msgs[i]])
+            i += 1
 
-        return valid_result
-
-    elif strategy == "first":
-        result = []
-
-        # Process segments from the beginning
-        for i, segment in enumerate(segments):
-            # Try adding this segment
-            test_msgs = result + segment
-            if token_counter(kept_messages + test_msgs) <= max_tokens:
-                result = result + segment
-            else:
-                # This segment would exceed the token limit
+    # If using the "last" strategy, add segments from the end until the token limit is reached.
+    if strategy == "last":
+        result_messages = []
+        # Iterate through segments in reverse order (newest to oldest).
+        for segment in reversed(segments):
+            segment_tokens = token_counter(segment)
+            current_result_tokens = token_counter(result_messages)
+            # Check if adding the next segment would exceed the token limit.
+            # The check includes the always-kept messages and the messages already added to the result.
+            if (kept_tokens + segment_tokens + current_result_tokens) > max_tokens:
+                # Adding this segment would make the list too long, so we stop.
+                logger.debug(
+                    f"Cannot add segment ({len(segment)} messages, {segment_tokens} tokens). "
+                    f"Total would be {kept_tokens + segment_tokens + current_result_tokens} > {max_tokens}. Stopping."
+                )
                 break
 
-        final_result = kept_messages + result
+            logger.debug(
+                f"Adding segment ({len(segment)} messages, {segment_tokens} tokens). "
+                f"New total: {kept_tokens + segment_tokens + current_result_tokens} <= {max_tokens}"
+            )
+            # Prepend the segment to maintain chronological order in the final list.
+            result_messages = segment + result_messages
 
+        final_result = kept_messages + result_messages
+
+        # Final validation: Ensure the last message is not an AIMessage with an unfulfilled tool call.
+        if (
+            final_result
+            and isinstance(final_result[-1], AIMessage)
+            and has_tool_use(final_result[-1])
+        ):
+            # This can happen if the last segment was a standalone AIMessage with a tool call.
+            # To maintain a valid conversation state, we remove it.
+            final_result.pop()
+
+        final_tokens = token_counter(final_result)
+        logger.debug(
+            f"Trimming complete. Final messages: {len(final_result)}, final_tokens: {final_tokens}"
+        )
         return final_result
+
+    # Fallback for "first" strategy (less common for agent history)
+    elif strategy == "first":
+        result_messages = []
+        for segment in segments:
+            if (
+                token_counter(kept_messages + result_messages + segment)
+                > max_tokens
+            ):
+                break
+            result_messages.extend(segment)
+        return kept_messages + result_messages
+
+    return list(messages)

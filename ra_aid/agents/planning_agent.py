@@ -15,13 +15,6 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from ra_aid.agent_context import (
-    agent_context,
-    is_completed,
-    reset_completion_flags,
-    should_exit,
-)
-
 # Import agent_utils functions at runtime to avoid circular imports
 from ra_aid import agent_utils
 from ra_aid.console.formatting import print_stage_header

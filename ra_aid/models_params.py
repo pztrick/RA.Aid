@@ -1201,6 +1201,13 @@ models_params = {
             "latency_coefficient": DEFAULT_BASE_LATENCY,
             "default_backend": AgentBackendType.CREATE_REACT_AGENT,
         },
+        "claude-sonnet-4-20250514": {
+            "token_limit": 200000,
+            "supports_temperature": True,
+            "default_temperature": DEFAULT_TEMPERATURE,
+            "latency_coefficient": DEFAULT_BASE_LATENCY,
+            "default_backend": AgentBackendType.CREATE_REACT_AGENT,
+        },
     },
     "bedrock": {
         "anthropic.claude-3-haiku-20240307-v1:0": {
