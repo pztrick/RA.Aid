@@ -586,12 +586,6 @@ def request_implementation(task_spec: str) -> str:
             hil=hil_enabled,
         )
 
-        # session_repo = get_session_repository() # Plan is now emitted by the agent
-        # session_record = session_repo.get_current_session_record()
-        # if session_record:
-        # session_record.plan = plan # Plan is now emitted by the agent
-        # session_record.save()
-
         success = True
         reason = None
     except AgentInterrupt:
@@ -703,7 +697,9 @@ def request_implementation(task_spec: str) -> str:
     # Add work log
     if response_data.get("work_log"):
         markdown_parts.append(f"\n## Work Log\n\n{response_data['work_log']}")
-        markdown_parts.append("\n\nTHE ABOVE WORK HAS BEEN COMPLETED")
+        markdown_parts.append(
+            "\n\nTHE ABOVE WORK HAS ALREADY BEEN COMPLETED --**DO NOT REQUEST IMPLEMENTATION OF IT AGAIN**"
+        )
 
     # Join all parts into a single markdown string
     markdown_output = "".join(markdown_parts)

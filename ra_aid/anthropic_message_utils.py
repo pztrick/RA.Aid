@@ -124,10 +124,6 @@ def anthropic_trim_messages(
     if initial_tokens <= max_tokens:
         return list(messages)
 
-    logger.debug(
-        f"Trimming messages: initial_tokens={initial_tokens}, max_tokens={max_tokens}, messages={len(messages)}"
-    )
-
     # Adjust num_messages_to_keep to not split a tool pair at the boundary.
     if (
         num_messages_to_keep > 0
@@ -143,7 +139,6 @@ def anthropic_trim_messages(
     remaining_msgs = messages[num_messages_to_keep:]
 
     kept_tokens = token_counter(kept_messages)
-    logger.debug(f"Keeping first {len(kept_messages)} messages, tokens={kept_tokens}")
 
     # Segment the remaining messages into atomic units.
     # A segment is either a single message or an AIMessage + ToolMessage pair.
@@ -172,16 +167,8 @@ def anthropic_trim_messages(
             # The check includes the always-kept messages and the messages already added to the result.
             if (kept_tokens + segment_tokens + current_result_tokens) > max_tokens:
                 # Adding this segment would make the list too long, so we stop.
-                logger.debug(
-                    f"Cannot add segment ({len(segment)} messages, {segment_tokens} tokens). "
-                    f"Total would be {kept_tokens + segment_tokens + current_result_tokens} > {max_tokens}. Stopping."
-                )
                 break
 
-            logger.debug(
-                f"Adding segment ({len(segment)} messages, {segment_tokens} tokens). "
-                f"New total: {kept_tokens + segment_tokens + current_result_tokens} <= {max_tokens}"
-            )
             # Prepend the segment to maintain chronological order in the final list.
             result_messages = segment + result_messages
 
@@ -197,10 +184,6 @@ def anthropic_trim_messages(
             # To maintain a valid conversation state, we remove it.
             final_result.pop()
 
-        final_tokens = token_counter(final_result)
-        logger.debug(
-            f"Trimming complete. Final messages: {len(final_result)}, final_tokens: {final_tokens}"
-        )
         return final_result
 
     # Fallback for "first" strategy (less common for agent history)
