@@ -72,6 +72,7 @@ def setup_logging(log_mode: str = "file", pretty: bool = False, log_level: Optio
         cwd = os.getcwd()
         ra_aid_dir_str = os.path.join(cwd, ".ra-aid")
     logs_dir_str = os.path.join(ra_aid_dir_str, "logs")
+    logging.getLogger("markdown_it").setLevel(logging.WARNING)
 
     # Create directory structure if log_mode is "file"
     if log_mode == "file":
