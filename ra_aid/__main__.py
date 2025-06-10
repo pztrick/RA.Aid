@@ -570,24 +570,39 @@ def parse_arguments(args=None):
 
     # last-cost
     parser_last_cost = subparsers.add_parser("last-cost", help="Display cost and token usage for the latest session.")
-    # --project-state-dir is global
+    parser_last_cost.add_argument(
+        "--project-state-dir",
+        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
+    )
 
     # all-costs
     parser_all_costs = subparsers.add_parser("all-costs", help="Display cost and token usage for all sessions.")
-    # --project-state-dir is global
+    parser_all_costs.add_argument(
+        "--project-state-dir",
+        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
+    )
 
     # extract-plan
     parser_extract_plan = subparsers.add_parser("extract-plan", help="Extract the plan for a session. Defaults to the latest session.")
     parser_extract_plan.add_argument("session_id", type=int, nargs='?', default=None, help="The ID of the session. If omitted, the latest session is used.")
-    # --project-state-dir is global
+    parser_extract_plan.add_argument(
+        "--project-state-dir",
+        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
+    )
 
     # extract-last-plan
     parser_extract_last_plan = subparsers.add_parser("extract-last-plan", help="Extract the plan for the most recent session.")
-    # --project-state-dir is global
+    parser_extract_last_plan.add_argument(
+        "--project-state-dir",
+        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
+    )
 
     # extract-last-research-notes
     parser_extract_last_research_notes = subparsers.add_parser("extract-last-research-notes", help="Extract research notes for the most recent session.")
-    # --project-state-dir is global
+    parser_extract_last_research_notes.add_argument(
+        "--project-state-dir",
+        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
+    )
     
     # generate-openapi
     parser_generate_openapi = subparsers.add_parser("generate-openapi", help="Generate and print the OpenAPI specification for the server.")
@@ -595,15 +610,24 @@ def parse_arguments(args=None):
     # create-migration
     parser_create_migration = subparsers.add_parser("create-migration", help="Create a new database migration.")
     parser_create_migration.add_argument("name", type=str, help="Name for the new migration (e.g., add_user_table).")
-    # --project-state-dir is global
+    parser_create_migration.add_argument(
+        "--project-state-dir",
+        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
+    )
 
     # migrate
     parser_migrate = subparsers.add_parser("migrate", help="Run all pending database migrations.")
-    # --project-state-dir is global
+    parser_migrate.add_argument(
+        "--project-state-dir",
+        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
+    )
 
     # migration-status
     parser_migration_status = subparsers.add_parser("migration-status", help="Show the current status of database migrations.")
-    # --project-state_dir is global
+    parser_migration_status.add_argument(
+        "--project-state-dir",
+        help="Directory to store project state (database and logs). By default, a .ra-aid directory is created in the current working directory.",
+    )
 
     # extract-changelog
     parser_extract_changelog = subparsers.add_parser("extract-changelog", help="Extract changelog entries for a specific version from CHANGELOG.md.")
