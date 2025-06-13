@@ -174,7 +174,7 @@ class MigrationManager:
 
             if not pending:
                 logger.info("No pending migrations to apply")
-                return True
+                return True, None
 
             logger.info(f"Applying {len(pending)} pending migrations...")
 
@@ -184,15 +184,17 @@ class MigrationManager:
                     logger.info(f"Applying migration: {migration}")
                     self.router.run(migration, fake=fake)
                     logger.info(f"Successfully applied migration: {migration}")
-                except Exception as e:
-                    logger.error(f"Failed to apply migration {migration}: {str(e)}")
-                    return False
+                except Exception as e_detail:
+                    err_msg = f"Failed to apply migration {migration}: {str(e_detail)}"
+                    logger.exception(err_msg)
+                    return False, err_msg
 
             logger.info(f"Successfully applied {len(pending)} migrations")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to apply migrations: {str(e)}")
-            return False
+            return True, None
+        except Exception as e_general:
+            err_msg = f"Failed to apply migrations: {str(e_general)}"
+            logger.exception(err_msg)
+            return False, err_msg
 
     def create_migration(self, name: str, auto: bool = True) -> Optional[str]:
         """
@@ -218,8 +220,8 @@ class MigrationManager:
 
             logger.info(f"Successfully created migration: {migration_name}")
             return migration_name
-        except Exception as e:
-            logger.error(f"Failed to create migration: {str(e)}")
+        except Exception:
+            logger.exception("Failed to create migration")
             return None
 
     def get_migration_status(self) -> Dict[str, Any]:
@@ -268,7 +270,7 @@ def ensure_migrations_applied() -> bool:
     the database schema is up to date.
 
     Returns:
-        bool: True if migrations were applied successfully or none were pending
+        Tuple[bool, Optional[str]]: (True if migrations were applied successfully or none were pending, Optional error message)
     """
     try:
         # Ensure .ra-aid directory exists for the database file
@@ -284,13 +286,16 @@ def ensure_migrations_applied() -> bool:
         with DatabaseManager() as db:
             try:
                 migration_manager = init_migrations(migrations_dir=migrations_dir)
-                return migration_manager.apply_migrations()
-            except Exception as e:
-                logger.error(f"Failed to apply migrations: {str(e)}")
-                return False
-    except Exception as e:
-        logger.error(f"Failed to ensure .ra-aid directory exists: {str(e)}")
-        return False
+                success, error_message = migration_manager.apply_migrations()
+                return success, error_message
+            except Exception as e_apply:
+                err_msg = f"Failed to apply migrations during ensure_migrations_applied: {str(e_apply)}"
+                logger.exception(err_msg)
+                return False, err_msg
+    except Exception as e_init:
+        err_msg = f"Failed to ensure .ra-aid directory exists or initialize migrations: {str(e_init)}"
+        logger.exception(err_msg)
+        return False, err_msg
 
 
 def create_new_migration(name: str, auto: bool = True) -> Optional[str]:
@@ -308,8 +313,8 @@ def create_new_migration(name: str, auto: bool = True) -> Optional[str]:
         try:
             migration_manager = init_migrations()
             return migration_manager.create_migration(name, auto)
-        except Exception as e:
-            logger.error(f"Failed to create migration: {str(e)}")
+        except Exception:
+            logger.exception("Failed to create migration in create_new_migration")
             return None
 
 
@@ -324,10 +329,10 @@ def get_migration_status() -> Dict[str, Any]:
         try:
             migration_manager = init_migrations()
             return migration_manager.get_migration_status()
-        except Exception as e:
-            logger.error(f"Failed to get migration status: {str(e)}")
+        except Exception as e: # Keep str(e) for the error field in the returned dict
+            logger.exception("Failed to get migration status")
             return {
-                "error": str(e),
+                "error": str(e), # User might rely on this specific error format
                 "applied_count": 0,
                 "pending_count": 0,
                 "applied": [],

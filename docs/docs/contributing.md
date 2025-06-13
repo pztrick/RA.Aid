@@ -89,6 +89,9 @@ VITE_BACKEND_PORT=4002 yarn dev  # hosts web app on 5173 (vite default port) tar
 yarn dev  # hosts web app on 5173 (default) targeting backend on 1818
 ```
 
+## Migrations
+See `ra_aid/database/MIGRATIONS.md` for reference on how to run migrations.
+
 ## This is Your Project Too
 
 RA.Aid is a community project that grows stronger with each contribution. Whether it's fixing a typo in documentation, reporting a bug, or adding a new feature - every contribution matters and is valued.

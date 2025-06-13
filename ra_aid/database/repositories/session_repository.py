@@ -10,15 +10,13 @@ from typing import Dict, List, Optional, Any
 import contextvars
 import datetime
 import json
-import logging
 import sys
 
 import peewee
 
-from ra_aid.config import DEFAULT_MODEL
 from ra_aid.database.models import Session, HumanInput
 from ra_aid.database.pydantic_models import SessionModel
-from ra_aid.exceptions import SessionNotFoundError # Import exception
+from ra_aid.exceptions import SessionNotFoundError
 from ra_aid.__version__ import __version__
 from ra_aid.logging_config import get_logger
 
@@ -189,6 +187,7 @@ class SessionRepository:
                 updated_at=session_dict.get("updated_at"),
                 status=session_dict.get("status"), # Added status mapping
                 display_name=session_dict.get("display_name"),
+                plan=session_dict.get("plan"),
             )
         else:
             # Handle regular model object
@@ -206,6 +205,7 @@ class SessionRepository:
                 updated_at=session.updated_at,
                 status=session.status, # Added status mapping
                 display_name=display_name,
+                plan=session.plan,
             )
 
     def create_session(self, metadata: Optional[Dict[str, Any]] = None) -> SessionModel:

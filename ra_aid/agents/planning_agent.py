@@ -1,7 +1,7 @@
 """
 Planning agent implementation.
 
-This module provides functionality for running a planning agent to create implementation 
+This module provides functionality for running a planning agent to create implementation
 plans. The agent can be configured with expert guidance and human-in-the-loop options.
 """
 
@@ -15,17 +15,22 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from ra_aid.agent_context import agent_context, is_completed, reset_completion_flags, should_exit
 # Import agent_utils functions at runtime to avoid circular imports
 from ra_aid import agent_utils
 from ra_aid.console.formatting import print_stage_header
 from ra_aid.database.repositories.key_fact_repository import get_key_fact_repository
-from ra_aid.database.repositories.key_snippet_repository import get_key_snippet_repository
-from ra_aid.database.repositories.research_note_repository import get_research_note_repository
+from ra_aid.database.repositories.key_snippet_repository import (
+    get_key_snippet_repository,
+)
+from ra_aid.database.repositories.research_note_repository import (
+    get_research_note_repository,
+)
 from ra_aid.database.repositories.config_repository import get_config_repository
 from ra_aid.database.repositories.work_log_repository import get_work_log_repository
 from ra_aid.database.repositories.trajectory_repository import get_trajectory_repository
-from ra_aid.database.repositories.human_input_repository import get_human_input_repository
+from ra_aid.database.repositories.human_input_repository import (
+    get_human_input_repository,
+)
 from ra_aid.env_inv_context import get_env_inv
 from ra_aid.exceptions import AgentInterrupt
 from ra_aid.llm import initialize_expert_llm
@@ -47,6 +52,18 @@ from ra_aid.tools.memory import get_related_files, log_work_event
 
 logger = get_logger(__name__)
 console = Console()
+
+
+def _get_research_only_note() -> str:
+    """
+    Determines the note to be included in the prompt based on research-related flags.
+    """
+    config_repo = get_config_repository()
+    if config_repo.get("research_and_plan_only", False):
+        return "Note: The --research-and-plan-only flag is active. Your sole responsibility is to create a comprehensive and detailed implementation plan. You must use the emit_plan tool to output the final plan. No other actions will be taken."
+    elif config_repo.get("research_only", False):
+        return " Only request implementation if the user explicitly asked for changes to be made."
+    return ""
 
 
 def run_planning_agent(
@@ -71,12 +88,22 @@ def run_planning_agent(
     Returns:
         Optional[str]: The completion message if planning completed successfully
     """
+    from ra_aid.database.repositories.config_repository import get_config_repository
+
+    config_repo = get_config_repository()
+    if config_repo.get("research_and_plan_only", False):
+        logger.warning(
+            "`run_planning_agent` was called in --research-and-plan-only mode, which should not happen. Aborting planning."
+        )
+        return None
+
     thread_id = thread_id or str(uuid.uuid4())
     logger.debug("Starting planning agent with thread_id=%s", thread_id)
     logger.debug("Planning configuration: expert=%s, hil=%s", expert_enabled, hil)
 
     if memory is None:
         from langgraph.checkpoint.memory import MemorySaver
+
         memory = MemorySaver()
 
     if thread_id is None:
@@ -159,7 +186,7 @@ def run_planning_agent(
 
     # Display the planning stage header before any reasoning assistance
     print_stage_header("Planning Stage")
-    
+
     # Record stage transition in trajectory
     trajectory_repo = get_trajectory_repository()
     human_input_id = get_human_input_repository().get_most_recent_id()
@@ -169,7 +196,7 @@ def run_planning_agent(
             "display_title": "Planning Stage",
         },
         record_type="stage_transition",
-        human_input_id=human_input_id
+        human_input_id=human_input_id,
     )
 
     # Initialize expert guidance section
@@ -314,7 +341,9 @@ def run_planning_agent(
             logger.error("Error getting expert guidance for planning: %s", e)
             expert_guidance = ""
 
-    agent = agent_utils.create_agent(model, tools, checkpointer=memory, agent_type="planner")
+    agent = agent_utils.create_agent(
+        model, tools, checkpointer=memory, agent_type="planner"
+    )
 
     expert_section = EXPERT_PROMPT_SECTION_PLANNING if expert_enabled else ""
     human_section = HUMAN_PROMPT_SECTION_PLANNING if hil else ""
@@ -350,18 +379,12 @@ def run_planning_agent(
         key_facts=key_facts,
         key_snippets=key_snippets,
         work_log=get_work_log_repository().format_work_log(),
-        research_only_note=(
-            ""
-            if get_config_repository().get("research_only", False)
-            else " Only request implementation if the user explicitly asked for changes to be made."
-        ),
+        research_only_note=_get_research_only_note(),
         env_inv=env_inv,
         expert_guidance_section=expert_guidance_section,
     )
 
-    recursion_limit = get_config_repository().get(
-        "recursion_limit", 100
-    )
+    recursion_limit = get_config_repository().get("recursion_limit", 100)
     run_config = {
         "configurable": {"thread_id": thread_id},
         "recursion_limit": recursion_limit,
@@ -373,7 +396,9 @@ def run_planning_agent(
     try:
         logger.debug("Planning agent completed successfully")
         none_or_fallback_handler = agent_utils.init_fallback_handler(agent, tools)
-        _result = agent_utils.run_agent_with_retry(agent, planning_prompt, none_or_fallback_handler)
+        _result = agent_utils.run_agent_with_retry(
+            agent, planning_prompt, none_or_fallback_handler
+        )
         if _result:
             # Log planning completion
             log_work_event(f"Completed planning phase for: {base_task}")

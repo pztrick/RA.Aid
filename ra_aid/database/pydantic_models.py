@@ -30,6 +30,7 @@ class SessionModel(BaseModel):
         machine_info: Dictionary containing machine-specific metadata
         status: The current lifecycle state of the session (e.g., 'pending', 'running', 'completed', 'error', 'halting', 'halted')
         display_name: Display name for the session (derived from human input or command line)
+        plan: The execution plan for the session
     """
     id: Optional[int] = None
     created_at: datetime.datetime
@@ -40,6 +41,7 @@ class SessionModel(BaseModel):
     machine_info: Optional[Dict[str, Any]] = None
     status: str # Added status field
     display_name: Optional[str] = None
+    plan: Optional[str] = None
 
     # Configure the model to work with ORM objects
     model_config = ConfigDict(from_attributes=True)

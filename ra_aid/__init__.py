@@ -10,6 +10,7 @@ from .console.output import print_agent_output
 from .text.processing import truncate_output
 from .scripts.last_session_usage import get_latest_session_usage
 from .scripts.all_sessions_usage import get_all_sessions_usage
+from .scripts.extract_plan import get_plan_for_session
 
 __all__ = [
     "print_stage_header",
@@ -22,4 +23,5 @@ __all__ = [
     "__version__",
     "get_latest_session_usage",
     "get_all_sessions_usage",
+    "get_plan_for_session",
 ]

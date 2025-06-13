@@ -62,6 +62,17 @@ logger = get_logger(__name__)
 console = Console()
 
 
+def _get_research_only_note(research_only: bool) -> str:
+    """Helper function to determine the research_only_note."""
+    research_and_plan_only = get_config_repository().get("research_and_plan_only", False)
+    if research_and_plan_only:
+        return "Note: The --research-and-plan-only flag is active. Your goal is to first conduct thorough research and use the emit_research_notes tool. Once research is complete, you must create a comprehensive implementation plan and use the emit_plan tool to output it. The process will exit after you emit the plan."
+    elif research_only:
+        return ""
+    else:
+        return " Only request implementation if the user explicitly asked for changes to be made."
+
+
 def run_research_agent(
     base_task_or_query: str,
     model,
@@ -385,15 +396,14 @@ YOU MUST FOLLOW THE EXPERT'S GUIDANCE OR ELSE BE TERMINATED!
 
     # Get environment inventory information
 
+    # Determine the research note based on the mode
+    research_only_note = _get_research_only_note(research_only)
+
     prompt = (RESEARCH_ONLY_PROMPT if research_only else RESEARCH_PROMPT).format(
         current_date=current_date,
         working_directory=working_directory,
         base_task=base_task,
-        research_only_note=(
-            ""
-            if research_only
-            else " Only request implementation if the user explicitly asked for changes to be made."
-        ),
+        research_only_note=research_only_note,
         expert_section=expert_section,
         human_section=human_section,
         web_research_section=web_research_section,

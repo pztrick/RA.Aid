@@ -136,7 +136,9 @@ class ResearchNoteRepository:
         
         return ResearchNoteModel.model_validate(note, from_attributes=True)
     
-    def create(self, content: str, human_input_id: Optional[int] = None) -> ResearchNoteModel:
+    def create(
+        self, content: str, human_input_id: Optional[int] = None, session_id: Optional[int] = None
+    ) -> ResearchNoteModel:
         """
         Create a new research note in the database.
         
@@ -151,7 +153,9 @@ class ResearchNoteRepository:
             peewee.DatabaseError: If there's an error creating the note
         """
         try:
-            note = ResearchNote.create(content=content, human_input_id=human_input_id)
+            note = ResearchNote.create(
+                content=content, human_input_id=human_input_id, session_id=session_id
+            )
             logger.debug(f"Created research note ID {note.id}: {content[:50]}...")
             return self._to_model(note)
         except peewee.DatabaseError as e:
@@ -251,6 +255,29 @@ class ResearchNoteRepository:
             return [self._to_model(note) for note in notes]
         except peewee.DatabaseError as e:
             logger.error(f"Failed to fetch all research notes: {str(e)}")
+            raise
+
+    def get_notes_by_session(self, session_id: int) -> List[ResearchNoteModel]:
+        """
+        Retrieve all research notes for a given session ID.
+        Args:
+            session_id: The ID of the session to retrieve notes for
+        Returns:
+            List[ResearchNoteModel]: A list of research notes for the session
+        Raises:
+            peewee.DatabaseError: If there's an error accessing the database
+        """
+        try:
+            notes = list(
+                ResearchNote.select()
+                .where(ResearchNote.session_id == session_id)
+                .order_by(ResearchNote.id)
+            )
+            return [self._to_model(note) for note in notes]
+        except peewee.DatabaseError as e:
+            logger.error(
+                f"Failed to fetch research notes for session {session_id}: {str(e)}"
+            )
             raise
     
     def get_notes_dict(self) -> Dict[int, str]:

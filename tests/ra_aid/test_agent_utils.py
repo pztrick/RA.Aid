@@ -143,7 +143,6 @@ def test_create_agent_anthropic(mock_model, mock_config_repository):
 
     with (
         patch("ra_aid.agent_utils.create_react_agent") as mock_react,
-        patch("ra_aid.anthropic_token_limiter.base_state_modifier") as mock_state_modifier,
         patch.dict("ra_aid.models_params.models_params", {"anthropic": mock_anthropic_model_config})
     ):
         mock_react.return_value = "react_agent"
@@ -157,7 +156,8 @@ def test_create_agent_anthropic(mock_model, mock_config_repository):
         assert mock_react.call_args[1]["interrupt_after"] == ["tools"]
         assert mock_react.call_args[1]["version"] == "v2"
         assert mock_react.call_args[1]["name"] == "claude-3-7-sonnet-20250219"
-        # Don't check state_modifier directly as it might be a dynamically created function
+        # Check that prompt is set when token limiting is on by default for anthropic
+        assert "prompt" in mock_react.call_args[1]
 
 
 def test_create_agent_openai(mock_model, mock_config_repository):
@@ -287,7 +287,7 @@ def test_create_agent_anthropic_token_limiting_enabled(
         agent = create_agent(mock_model, [])
 
         assert agent == "react_agent"
-        assert "state_modifier" in mock_react.call_args[1]
+        assert "prompt" in mock_react.call_args[1]
 
 
 def test_create_agent_anthropic_token_limiting_disabled(
@@ -328,7 +328,7 @@ def test_create_agent_anthropic_token_limiting_disabled(
         assert mock_react.call_args[1]["version"] == "v2"
         assert mock_react.call_args[1]["name"] == "claude-3-7-sonnet-20250219"
         # Verify state_modifier is not in the kwargs when token limiting is disabled
-        assert "state_modifier" not in mock_react.call_args[1]
+        assert "prompt" not in mock_react.call_args[1]
 
 
 # These tests have been moved to test_anthropic_token_limiter.py

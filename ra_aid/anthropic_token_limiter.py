@@ -1,6 +1,7 @@
 """Utilities for handling token limits with Anthropic models."""
 
 from functools import partial
+import json
 from typing import Any, Dict, List, Optional, Sequence
 
 from langchain.chat_models.base import BaseChatModel
@@ -47,6 +48,10 @@ def estimate_messages_tokens(messages: Sequence[BaseMessage]) -> int:
 def convert_message_to_litellm_format(message: BaseMessage) -> Dict:
     """Convert a BaseMessage to the format expected by litellm.
 
+    This function handles variations in message structures that can occur
+    between different models (e.g., Anthropic Sonnet 4 vs. 3.7) and ensures
+    that the output is always in a format that litellm's token counter can process.
+
     Args:
         message: The BaseMessage to convert
 
@@ -54,10 +59,96 @@ def convert_message_to_litellm_format(message: BaseMessage) -> Dict:
         Dict in litellm format
     """
     message_dict = message_to_dict(message)
-    return {
+
+    # Handle ToolMessage separately for correct litellm format
+    if message_dict["type"] == "tool":
+        content = message_dict["data"]["content"]
+        # litellm expects tool message content to be a string.
+        if not isinstance(content, str):
+            content = json.dumps(content)
+
+        tool_message = {
+            "role": "tool",
+            "content": content,
+            "tool_call_id": message_dict["data"]["tool_call_id"],
+        }
+        return tool_message
+
+    content = message_dict["data"]["content"]
+
+    litellm_message = {
         "role": message_dict["type"],
-        "content": message_dict["data"]["content"],
+        "content": None,
     }
+    tool_calls = []
+
+    # Handle content list by sanitizing parts into litellm-compatible format
+    if isinstance(content, list):
+        new_content_list = []
+        for part in content:
+            if isinstance(part, dict):
+                part_type = part.get("type")
+                if part_type == "tool_use":
+                    tool_calls.append(
+                        {
+                            "id": part["id"],
+                            "type": "function",
+                            "function": {
+                                "name": part["name"],
+                                "arguments": json.dumps(part.get("input", {})),
+                            },
+                        }
+                    )
+                elif part_type == "text":
+                    new_content_list.append(part)
+                else:
+                    # This is an unknown dictionary type. To be safe, serialize it as a text block.
+                    new_content_list.append({"type": "text", "text": json.dumps(part)})
+            elif isinstance(part, str):
+                # If a string is part of the list, wrap it in a text block.
+                new_content_list.append({"type": "text", "text": part})
+            else:
+                # For any other type, convert to string and wrap in a text block.
+                new_content_list.append({"type": "text", "text": str(part)})
+
+        if new_content_list:
+            if len(new_content_list) == 1 and new_content_list[0].get("type") == "text":
+                litellm_message["content"] = new_content_list[0].get("text")
+            else:
+                litellm_message["content"] = new_content_list
+
+    elif isinstance(content, str):
+        litellm_message["content"] = content
+
+    # Handle tool calls from additional_kwargs (common in some message formats)
+    additional_kwargs = message_dict["data"].get("additional_kwargs", {})
+    if "tool_calls" in additional_kwargs and additional_kwargs["tool_calls"]:
+        for tc in additional_kwargs["tool_calls"]:
+            # Avoid duplicating tool calls if they were already processed from content
+            if not any(existing_tc.get("id") == tc.get("id") for existing_tc in tool_calls):
+                args = tc.get("function", {}).get("arguments", "")
+                if isinstance(args, dict):
+                    args = json.dumps(args)
+
+                tool_calls.append(
+                    {
+                        "id": tc.get("id"),
+                        "type": "function",
+                        "function": {
+                            "name": tc.get("function", {}).get("name"),
+                            "arguments": args,
+                        },
+                    }
+                )
+
+    if tool_calls:
+        litellm_message["tool_calls"] = tool_calls
+
+    # If content is an empty list, litellm prefers it to be None
+    if isinstance(litellm_message["content"], list) and not litellm_message["content"]:
+        litellm_message["content"] = None
+
+    return litellm_message
 
 
 def create_token_counter_wrapper(model: str):
@@ -165,6 +256,11 @@ def base_state_modifier(
     )
 
     result = [first_message] + trimmed_remaining
+
+    if len(result) < len(messages):
+        logger.debug(
+            f"Base Token Limiter Trimmed: {len(messages)} messages → {len(result)} messages"
+        )
 
     return result
 

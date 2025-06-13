@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Union
 import logging
 
 from langchain_core.tools import tool
-from langchain_text_splitters import markdown
 from rich.console import Console
 
 from ra_aid.agent_context import (
@@ -16,21 +15,31 @@ from ra_aid.agent_context import (
 )
 from ra_aid.config import DEFAULT_MODEL
 from ra_aid.console.formatting import print_error, print_task_header
-from ra_aid.database.repositories.human_input_repository import get_human_input_repository
+from ra_aid.database.repositories.human_input_repository import (
+    get_human_input_repository,
+)
 from ra_aid.database.repositories.key_fact_repository import get_key_fact_repository
-from ra_aid.database.repositories.key_snippet_repository import get_key_snippet_repository
+from ra_aid.database.repositories.key_snippet_repository import (
+    get_key_snippet_repository,
+)
 from ra_aid.database.repositories.config_repository import get_config_repository
 from ra_aid.database.repositories.trajectory_repository import get_trajectory_repository
-from ra_aid.database.repositories.related_files_repository import get_related_files_repository
-from ra_aid.database.repositories.research_note_repository import get_research_note_repository
+from ra_aid.database.repositories.related_files_repository import (
+    get_related_files_repository,
+)
+from ra_aid.database.repositories.research_note_repository import (
+    get_research_note_repository,
+)
 from ra_aid.exceptions import AgentInterrupt
 from ra_aid.model_formatters import format_key_facts_dict
 from ra_aid.model_formatters.key_snippets_formatter import format_key_snippets_dict
 from ra_aid.model_formatters.research_notes_formatter import format_research_notes_dict
+from ra_aid.database.repositories.session_repository import get_session_repository
 
 from ra_aid.llm import initialize_llm
-from .human import ask_human
-from .memory import get_related_files, get_work_log
+from ra_aid.tools.human import ask_human
+from ra_aid.tools.memory import get_related_files, get_work_log
+
 
 ResearchResult = Dict[str, Union[str, bool, Dict[int, Any], List[Any], None]]
 
@@ -63,7 +72,7 @@ def request_research(query: str) -> ResearchResult:
     current_depth = get_depth()
     if current_depth >= RESEARCH_AGENT_RECURSION_LIMIT:
         error_message = "Maximum research recursion depth reached"
-        
+
         # Record error in trajectory
         trajectory_repo = get_trajectory_repository()
         human_input_id = get_human_input_repository().get_most_recent_id()
@@ -75,22 +84,26 @@ def request_research(query: str) -> ResearchResult:
             record_type="error",
             human_input_id=human_input_id,
             is_error=True,
-            error_message=error_message
+            error_message=error_message,
         )
-        
+
         print_error(error_message)
         try:
-            key_facts = format_key_facts_dict(get_key_fact_repository().get_facts_dict())
+            key_facts = format_key_facts_dict(
+                get_key_fact_repository().get_facts_dict()
+            )
         except RuntimeError as e:
             logger.error(f"Failed to access key fact repository: {str(e)}")
             key_facts = ""
 
         try:
-            key_snippets = format_key_snippets_dict(get_key_snippet_repository().get_snippets_dict())
+            key_snippets = format_key_snippets_dict(
+                get_key_snippet_repository().get_snippets_dict()
+            )
         except RuntimeError as e:
             logger.error(f"Failed to access key snippet repository: {str(e)}")
             key_snippets = ""
-            
+
         return {
             "completion_message": "Research stopped - maximum recursion depth reached",
             "key_facts": key_facts,
@@ -125,7 +138,7 @@ def request_research(query: str) -> ResearchResult:
         raise
     except Exception as e:
         error_message = f"Error during research: {str(e)}"
-        
+
         # Record error in trajectory
         trajectory_repo = get_trajectory_repository()
         human_input_id = get_human_input_repository().get_most_recent_id()
@@ -137,9 +150,9 @@ def request_research(query: str) -> ResearchResult:
             record_type="error",
             human_input_id=human_input_id,
             is_error=True,
-            error_message=error_message
+            error_message=error_message,
         )
-        
+
         print_error(error_message)
         success = False
         reason = f"error: {str(e)}"
@@ -159,9 +172,11 @@ def request_research(query: str) -> ResearchResult:
     except RuntimeError as e:
         logger.error(f"Failed to access key fact repository: {str(e)}")
         key_facts = ""
-        
+
     try:
-        key_snippets = format_key_snippets_dict(get_key_snippet_repository().get_snippets_dict())
+        key_snippets = format_key_snippets_dict(
+            get_key_snippet_repository().get_snippets_dict()
+        )
     except RuntimeError as e:
         logger.error(f"Failed to access key snippet repository: {str(e)}")
         key_snippets = ""
@@ -173,7 +188,7 @@ def request_research(query: str) -> ResearchResult:
     except RuntimeError as e:
         logger.error(f"Failed to access research note repository: {str(e)}")
         formatted_research_notes = ""
-        
+
     response_data = {
         "completion_message": completion_message,
         "key_facts": key_facts,
@@ -225,7 +240,7 @@ def request_web_research(query: str) -> ResearchResult:
         raise
     except Exception as e:
         error_message = f"Error during web research: {str(e)}"
-        
+
         # Record error in trajectory
         trajectory_repo = get_trajectory_repository()
         human_input_id = get_human_input_repository().get_most_recent_id()
@@ -237,9 +252,9 @@ def request_web_research(query: str) -> ResearchResult:
             record_type="error",
             human_input_id=human_input_id,
             is_error=True,
-            error_message=error_message
+            error_message=error_message,
         )
-        
+
         print_error(error_message)
         success = False
         reason = f"error: {str(e)}"
@@ -255,7 +270,9 @@ def request_web_research(query: str) -> ResearchResult:
         reset_completion_flags()
 
     try:
-        key_snippets = format_key_snippets_dict(get_key_snippet_repository().get_snippets_dict())
+        key_snippets = format_key_snippets_dict(
+            get_key_snippet_repository().get_snippets_dict()
+        )
     except RuntimeError as e:
         logger.error(f"Failed to access key snippet repository: {str(e)}")
         key_snippets = ""
@@ -267,7 +284,7 @@ def request_web_research(query: str) -> ResearchResult:
     except RuntimeError as e:
         logger.error(f"Failed to access research note repository: {str(e)}")
         formatted_research_notes = ""
-        
+
     response_data = {
         "completion_message": completion_message,
         "key_snippets": key_snippets,
@@ -339,9 +356,11 @@ def request_research_and_implementation(query: str) -> Dict[str, Any]:
     except RuntimeError as e:
         logger.error(f"Failed to access key fact repository: {str(e)}")
         key_facts = ""
-        
+
     try:
-        key_snippets = format_key_snippets_dict(get_key_snippet_repository().get_snippets_dict())
+        key_snippets = format_key_snippets_dict(
+            get_key_snippet_repository().get_snippets_dict()
+        )
     except RuntimeError as e:
         logger.error(f"Failed to access key snippet repository: {str(e)}")
         key_snippets = ""
@@ -353,7 +372,7 @@ def request_research_and_implementation(query: str) -> Dict[str, Any]:
     except RuntimeError as e:
         logger.error(f"Failed to access research note repository: {str(e)}")
         formatted_research_notes = ""
-        
+
     response_data = {
         "completion_message": completion_message,
         "key_facts": key_facts,
@@ -380,7 +399,7 @@ def request_task_implementation(task_spec: str) -> str:
     # Initialize model from config
     model = initialize_llm(
         get_config_repository().get("provider", "anthropic"),
-        get_config_repository().get("model",DEFAULT_MODEL),
+        get_config_repository().get("model", DEFAULT_MODEL),
         temperature=get_config_repository().get("temperature"),
     )
 
@@ -389,7 +408,7 @@ def request_task_implementation(task_spec: str) -> str:
 
     try:
         print_task_header(task_spec)
-        
+
         # Record task display in trajectory
         trajectory_repo = get_trajectory_repository()
         human_input_id = get_human_input_repository().get_most_recent_id()
@@ -400,9 +419,9 @@ def request_task_implementation(task_spec: str) -> str:
                 "display_title": "Task",
             },
             record_type="task_display",
-            human_input_id=human_input_id
+            human_input_id=human_input_id,
         )
-        
+
         # Run implementation agent
         from ..agents.implementation_agent import run_task_implementation_agent
 
@@ -429,7 +448,7 @@ def request_task_implementation(task_spec: str) -> str:
         raise
     except Exception as e:
         error_message = f"Error during task implementation: {str(e)}"
-        
+
         # Record error in trajectory
         trajectory_repo = get_trajectory_repository()
         human_input_id = get_human_input_repository().get_most_recent_id()
@@ -441,9 +460,9 @@ def request_task_implementation(task_spec: str) -> str:
             record_type="error",
             human_input_id=human_input_id,
             is_error=True,
-            error_message=error_message
+            error_message=error_message,
         )
-        
+
         print_error(error_message)
         success = False
         reason = f"error: {str(e)}"
@@ -468,13 +487,15 @@ def request_task_implementation(task_spec: str) -> str:
     except RuntimeError as e:
         logger.error(f"Failed to access key fact repository: {str(e)}")
         key_facts = ""
-        
+
     try:
-        key_snippets = format_key_snippets_dict(get_key_snippet_repository().get_snippets_dict())
+        key_snippets = format_key_snippets_dict(
+            get_key_snippet_repository().get_snippets_dict()
+        )
     except RuntimeError as e:
         logger.error(f"Failed to access key snippet repository: {str(e)}")
         key_snippets = ""
-        
+
     response_data = {
         "key_facts": key_facts,
         "related_files": get_related_files(),
@@ -528,7 +549,7 @@ def request_task_implementation(task_spec: str) -> str:
     if response_data.get("work_log"):
         markdown_parts.append(f"\n## Work Log\n\n{response_data['work_log']}")
         markdown_parts.append(
-            "\n\nTHE ABOVE WORK HAS BEEN COMPLETED"
+            "\n\nTHE ABOVE WORK HAS ALREADY BEEN COMPLETED --**DO NOT REQUEST IMPLEMENTATION OF IT AGAIN**"
         )
 
     # Join all parts into a single markdown string
@@ -544,24 +565,25 @@ def request_implementation(task_spec: str) -> str:
     Args:
         task_spec: The task specification to plan implementation for
     """
-    # Initialize model from config
+
     model = initialize_llm(
         get_config_repository().get("provider", "anthropic"),
         get_config_repository().get("model", DEFAULT_MODEL),
         temperature=get_config_repository().get("temperature"),
     )
 
+    hil_enabled = get_config_repository().get("hil", False)
+
     try:
-        # Run planning agent
         from ..agents import run_planning_agent
 
         reset_completion_flags()
 
-        _result = run_planning_agent(
+        run_planning_agent(
             task_spec,
             model,
             expert_enabled=True,
-            hil=get_config_repository().get("hil", False),
+            hil=hil_enabled,
         )
 
         success = True
@@ -575,7 +597,7 @@ def request_implementation(task_spec: str) -> str:
         raise
     except Exception as e:
         error_message = f"Error during planning: {str(e)}"
-        
+
         # Record error in trajectory
         trajectory_repo = get_trajectory_repository()
         human_input_id = get_human_input_repository().get_most_recent_id()
@@ -587,9 +609,9 @@ def request_implementation(task_spec: str) -> str:
             record_type="error",
             human_input_id=human_input_id,
             is_error=True,
-            error_message=error_message
+            error_message=error_message,
         )
-        
+
         print_error(error_message)
         success = False
         reason = f"error: {str(e)}"
@@ -614,22 +636,24 @@ def request_implementation(task_spec: str) -> str:
     except RuntimeError as e:
         logger.error(f"Failed to access key fact repository: {str(e)}")
         key_facts = ""
-        
+
     try:
-        key_snippets = format_key_snippets_dict(get_key_snippet_repository().get_snippets_dict())
+        key_snippets = format_key_snippets_dict(
+            get_key_snippet_repository().get_snippets_dict()
+        )
     except RuntimeError as e:
         logger.error(f"Failed to access key snippet repository: {str(e)}")
         key_snippets = ""
-        
+
     response_data = {
         "completion_message": completion_message,
-        "key_facts": key_facts,
-        "related_files": get_related_files(),
-        "key_snippets": key_snippets,
         "success": success and not agent_crashed,
         "reason": reason,
         "agent_crashed": agent_crashed,
         "crash_message": crash_message,
+        "key_facts": key_facts,
+        "related_files": get_related_files(),
+        "key_snippets": key_snippets,
     }
     if work_log is not None:
         response_data["work_log"] = work_log
