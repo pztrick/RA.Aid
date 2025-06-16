@@ -1377,4 +1377,45 @@ models_params = {
             "latency_coefficient": DEFAULT_BASE_LATENCY,
         }
     },
+    "makehub": {
+        "qwen/Qwen2.5-Coder-32B": {
+            "token_limit": 32000,
+            "default_temperature": 0.4,
+            "supports_temperature": True,
+            "latency_coefficient": DEFAULT_BASE_LATENCY,
+            "max_tokens": 32000,
+            "reasoning_assist_default": False,
+        },
+        "deepseek/deepseek-V3-0324-fp8": {
+            "token_limit": 32000,
+            "supports_temperature": True,
+            "default_temperature": DEFAULT_TEMPERATURE,
+            "supports_reasoning_effort": False,
+            "latency_coefficient": DEFAULT_BASE_LATENCY,
+            "default_backend": AgentBackendType.CIAYN,
+        },
+        "mistral/mistral-small-24B-fp16": {
+            "token_limit": 32768,
+            "supports_temperature": True,
+            "default_temperature": DEFAULT_TEMPERATURE,
+            "supports_reasoning_effort": False,
+            "latency_coefficient": DEFAULT_BASE_LATENCY,
+            "default_backend": AgentBackendType.CIAYN,
+        },    
+        "google/gemini-2.5-pro-preview": {
+            "token_limit": 1048576,
+            "max_tokens": 1048576,
+            "supports_temperature": True,
+            "default_temperature": 0.3,
+            "latency_coefficient": DEFAULT_BASE_LATENCY,
+            "default_backend": AgentBackendType.CIAYN,
+        },
+        "anthropic/claude-4-sonnet": {
+            "token_limit": 200000,
+            "supports_temperature": True,
+            "default_temperature": DEFAULT_TEMPERATURE,
+            "latency_coefficient": DEFAULT_BASE_LATENCY,
+            "default_backend": AgentBackendType.CREATE_REACT_AGENT,
+        },
+    },
 }

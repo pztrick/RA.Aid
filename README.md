@@ -159,6 +159,9 @@ export OPENAI_API_KEY=your_api_key_here
 # For OpenRouter provider (optional)
 export OPENROUTER_API_KEY=your_api_key_here
 
+# For Makehub provider (optional)
+export MAKEHUB_API_KEY=your_api_key_here
+
 # For OpenAI-compatible providers (optional)
 export OPENAI_API_BASE=your_api_base_url
 
@@ -178,6 +181,7 @@ You can get your API keys from:
 - Anthropic API key: https://console.anthropic.com/
 - OpenAI API key: https://platform.openai.com/api-keys
 - OpenRouter API key: https://openrouter.ai/keys
+- Makehub API key: https://makehub.ai/
 - Gemini API key: https://aistudio.google.com/app/apikey
 
 Note: `aider` must be installed separately as it is not included in the RA.Aid package. See [aider-chat](https://pypi.org/project/aider-chat/) for more details.
@@ -209,7 +213,7 @@ More information is available in our [Usage Examples](https://docs.ra-aid.ai/cat
 - `-m, --message`: The task or query to be executed (required except in chat mode, cannot be used with --msg-file)
 - `--msg-file`: Path to a text file containing the task/message (cannot be used with --message)
 - `--research-only`: Only perform research without implementation
-- `--provider`: The LLM provider to use (choices: anthropic, openai, openrouter, openai-compatible, gemini)
+- `--provider`: The LLM provider to use (choices: anthropic, openai, openrouter, openai-compatible, makehub, gemini)
 - `--model`: The model name to use (required for non-Anthropic providers)
 - `--use-aider`: Enable aider integration for code editing. When enabled, RA.Aid uses aider's specialized code editing capabilities instead of its own native file modification tools. This option is useful when you need aider's specific editing features or prefer its approach to code modifications. This feature is optional and disabled by default.
 - `--research-provider`: Provider to use specifically for research tasks (falls back to --provider if not specified)
@@ -217,7 +221,7 @@ More information is available in our [Usage Examples](https://docs.ra-aid.ai/cat
 - `--planner-provider`: Provider to use specifically for planning tasks (falls back to --provider if not specified)
 - `--planner-model`: Model to use specifically for planning tasks (falls back to --model if not specified)
 - `--cowboy-mode`: Skip interactive approval for shell commands
-- `--expert-provider`: The LLM provider to use for expert knowledge queries (choices: anthropic, openai, openrouter, openai-compatible, gemini)
+- `--expert-provider`: The LLM provider to use for expert knowledge queries (choices: anthropic, openai, openrouter, openai-compatible, makehub, gemini)
 - `--expert-model`: The model name to use for expert knowledge queries (required for non-OpenAI providers)
 - `--hil, -H`: Enable human-in-the-loop mode for interactive assistance during task execution
 - `--chat`: Enable chat mode with direct human interaction (implies --hil)
@@ -243,6 +247,7 @@ More information is available in our [Usage Examples](https://docs.ra-aid.ai/cat
 - `--max-cost`: Maximum cost threshold in USD (positive float)
 - `--max-tokens`: Maximum token threshold (positive integer)
 - `--exit-at-limit`: Exit immediately without prompting when --max-cost or --max-tokens limits are reached
+- `--price-performance-ratio`: Price-performance ratio for Makehub API (0.0-1.0, where 0.0 prioritizes speed and 1.0 prioritizes cost efficiency)
 - `--version`: Show program version number and exit
 - `--server`: Launch the server with web interface (alpha feature)
 - `--server-host`: Host to listen on for server (default: 0.0.0.0)  (alpha feature)
@@ -389,6 +394,7 @@ RA.Aid supports multiple providers through environment variables:
 - `ANTHROPIC_API_KEY`: Required for the default Anthropic provider
 - `OPENAI_API_KEY`: Required for OpenAI provider
 - `OPENROUTER_API_KEY`: Required for OpenRouter provider
+- `MAKEHUB_API_KEY`: Required for Makehub provider
 - `DEEPSEEK_API_KEY`: Required for DeepSeek provider
 - `OPENAI_API_BASE`: Required for OpenAI-compatible providers along with `OPENAI_API_KEY`
 - `GEMINI_API_KEY`: Required for Gemini provider
@@ -397,6 +403,7 @@ Expert Tool Environment Variables:
 - `EXPERT_OPENAI_API_KEY`: API key for expert tool using OpenAI provider
 - `EXPERT_ANTHROPIC_API_KEY`: API key for expert tool using Anthropic provider
 - `EXPERT_OPENROUTER_API_KEY`: API key for expert tool using OpenRouter provider
+- `EXPERT_MAKEHUB_API_KEY`: API key for expert tool using Makehub provider (automatically uses `MAKEHUB_API_KEY` if not set)
 - `EXPERT_OPENAI_API_BASE`: Base URL for expert tool using OpenAI-compatible provider
 - `EXPERT_GEMINI_API_KEY`: API key for expert tool using Gemini provider
 - `EXPERT_DEEPSEEK_API_KEY`: API key for expert tool using DeepSeek provider
@@ -412,6 +419,9 @@ export OPENAI_API_KEY=your_api_key_here
 
 # For OpenRouter provider
 export OPENROUTER_API_KEY=your_api_key_here
+
+# For Makehub provider
+export MAKEHUB_API_KEY=your_api_key_here
 
 # For OpenAI-compatible providers
 export OPENAI_API_BASE=your_api_base_url
@@ -441,7 +451,15 @@ export GEMINI_API_KEY=your_api_key_here
    ra-aid -m "Your task" --provider openrouter --model mistralai/mistral-large-2411
    ```
 
-4. **Using DeepSeek**
+4. **Using Makehub**
+   ```bash
+   ra-aid -m "Your task" --provider makehub --model openai/gpt-4o
+   
+   # With price-performance optimization
+   ra-aid -m "Your task" --provider makehub --model anthropic/claude-4-sonnet --price-performance-ratio 0.7
+   ```
+
+5. **Using DeepSeek**
    ```bash
    # Direct DeepSeek provider (requires DEEPSEEK_API_KEY)
    ra-aid -m "Your task" --provider deepseek --model deepseek-reasoner
@@ -450,7 +468,7 @@ export GEMINI_API_KEY=your_api_key_here
    ra-aid -m "Your task" --provider openrouter --model deepseek/deepseek-r1
    ```
 
-4. **Configuring Expert Provider**
+6. **Configuring Expert Provider**
 
    The expert tool is used by the agent for complex logic and debugging tasks. It can be configured to use different providers (OpenAI, Anthropic, OpenRouter, Gemini, openai-compatible) using the --expert-provider flag along with the corresponding EXPERT_*API_KEY environment variables.
 
@@ -466,6 +484,10 @@ export GEMINI_API_KEY=your_api_key_here
    # Use DeepSeek for expert tool
    export DEEPSEEK_API_KEY=your_deepseek_api_key
    ra-aid -m "Your task" --expert-provider deepseek --expert-model deepseek-reasoner
+
+   # Use Makehub for expert tool (automatically uses MAKEHUB_API_KEY)
+   export MAKEHUB_API_KEY=your_makehub_api_key
+   ra-aid -m "Your task" --expert-provider makehub --expert-model anthropic/claude-4-sonnet
 
    # Use default OpenAI for expert tool
    export EXPERT_OPENAI_API_KEY=your_openai_api_key

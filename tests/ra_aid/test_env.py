@@ -33,6 +33,8 @@ def clean_env(monkeypatch):
         "EXPERT_OPENAI_API_BASE",
         "TAVILY_API_KEY",
         "ANTHROPIC_MODEL",
+        "MAKEHUB_API_KEY",
+        "EXPERT_MAKEHUB_API_KEY",
     ]
     for var in env_vars:
         monkeypatch.delenv(var, raising=False)

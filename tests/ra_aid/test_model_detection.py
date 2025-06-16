@@ -179,6 +179,9 @@ def test_is_anthropic_claude():
     # Test positive cases - OpenRouter with Anthropic model
     assert is_anthropic_claude({"provider": "openrouter", "model": "anthropic/claude-3.7"})
     
+    # Test positive cases - MakeHub with Anthropic model
+    assert is_anthropic_claude({"provider": "makehub", "model": "anthropic/claude-4-sonnet"})
+    
     # Test negative cases
     assert not is_anthropic_claude({"provider": "openai", "model": "gpt-4"})
     assert not is_anthropic_claude({"provider": "anthropic", "model": "gpt-4"})  # Wrong model for provider

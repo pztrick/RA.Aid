@@ -103,6 +103,8 @@ DEFAULT_EXPERT_ANTHROPIC_MODEL = "claude-3-7-sonnet-20250219"
 DEFAULT_EXPERT_OPENAI_MODEL = "o4-mini"
 DEFAULT_EXPERT_GEMINI_MODEL = "gemini-2.5-pro-preview-05-06"
 DEFAULT_EXPERT_DEEPSEEK_MODEL = "deepseek-reasoner"
+DEFAULT_MAKEHUB_MODEL = "anthropic/claude-4-sonnet"
+DEFAULT_EXPERT_MAKEHUB_MODEL = "anthropic/claude-4-sonnet"
 DEFAULT_SHOW_COST = True
 DEFAULT_MAX_COST = None
 DEFAULT_MAX_TOKENS = None
@@ -120,4 +122,5 @@ VALID_PROVIDERS = [
     "fireworks",
     "groq",
     "bedrock",
+    "makehub"
 ]

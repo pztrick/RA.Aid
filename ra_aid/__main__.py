@@ -200,6 +200,7 @@ def launch_server(host: str, port: int, args):
             "openrouter",
             "openai-compatible",
             "deepseek",
+            "makehub",
         ],
     )
 
@@ -565,6 +566,11 @@ def parse_arguments(args=None):
         type=str,
         help="Set the default model to use for future runs",
     )
+    parser.add_argument(
+        "--price-performance-ratio",
+        type=float,
+        help="Price-performance ratio for Makehub API (0.0-1.0, where 0.0 prioritizes speed and 1.0 prioritizes cost efficiency)",
+    )
 
     # --- Script Subcommands ---
 
@@ -761,6 +767,11 @@ Examples:
     # Validate max_tokens is positive if provided
     if parsed_args.max_tokens is not None and parsed_args.max_tokens <= 0:
         parser.error("--max-tokens must be a positive integer")
+
+    # Validate price-performance-ratio range only for MakeHub provider
+    if parsed_args.provider == "makehub" and parsed_args.price_performance_ratio is not None:
+        if not (0.0 <= parsed_args.price_performance_ratio <= 1.0):
+            parser.error("--price-performance-ratio must be between 0.0 and 1.0")
 
     return parsed_args
 
@@ -1249,6 +1260,7 @@ def main():
                         "openrouter",
                         "openai-compatible",
                         "deepseek",
+                        "makehub",
                     ],
                 )
 
@@ -1276,6 +1288,7 @@ def main():
                 config_repo.set("expert_model", args.expert_model)
                 config_repo.set("expert_num_ctx", args.expert_num_ctx)
                 config_repo.set("temperature", args.temperature)
+                config_repo.set("price_performance_ratio", args.price_performance_ratio)
                 config_repo.set(
                     "experimental_fallback_handler", args.experimental_fallback_handler
                 )
@@ -1409,6 +1422,7 @@ def main():
                     config_repo.set("expert_model", args.expert_model)
                     config_repo.set("expert_num_ctx", args.expert_num_ctx)
                     config_repo.set("temperature", args.temperature)
+                    config_repo.set("price_performance_ratio", args.price_performance_ratio)
                     config_repo.set("show_thoughts", args.show_thoughts)
                     config_repo.set("show_cost", args.show_cost)
                     config_repo.set("track_cost", args.track_cost)
@@ -1577,6 +1591,7 @@ def main():
 
                 # Store temperature in config
                 config_repo.set("temperature", args.temperature)
+                config_repo.set("price_performance_ratio", args.price_performance_ratio)
 
                 # Store reasoning assistance flags
                 config_repo.set("force_reasoning_assistance", args.reasoning_assistance)

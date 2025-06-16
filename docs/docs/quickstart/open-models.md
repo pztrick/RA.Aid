@@ -20,6 +20,7 @@ RA.Aid supports these model providers:
 |-------------------|---------------------------------------------------------|-------------------------------------------------------------------|
 | DeepSeek          | Chinese hedge fund who creates sophisticated LLMs       | Strong, open models like R1                                       |
 | Fireworks         | Serverless AI inference platform for open-source models | High-performance inference, pay-per-token, variety of open models |
+| MakeHub           | OpenAI-compatible AI router optimized for developers    | Customizable speed/price ratio, curated latest models, dev-optimized performance |
 | OpenRouter        | Multi-model gateway service                             | Access to 100+ models, unified API interface, pay-per-token       |
 | OpenAI-compatible | Self-hosted model endpoints                             | Compatible with Llama, Mistral and other open models              |
 | Anthropic         | Claude model series                                     | 200k token context, strong tool use, JSON/XML parsing             |
@@ -37,6 +38,7 @@ RA.Aid supports these model providers:
 # Choose the appropriate provider
 export DEEPSEEK_API_KEY=your_key
 export FIREWORKS_API_KEY=your_key
+export MAKEHUB_API_KEY=your_key
 export OPENROUTER_API_KEY=your_key
 export OPENAI_API_KEY=your_key
 export ANTHROPIC_API_KEY=your_key
@@ -81,6 +83,48 @@ ra-aid -m "Your task" --provider deepseek --model deepseek-reasoner --temperatur
 **Available Models:**
 - `deepseek-reasoner`: Optimized for reasoning tasks
 - Access via OpenRouter: `deepseek/deepseek-r1`
+</TabItem>
+<TabItem value="makehub" label="MakeHub">
+
+### MakeHub Integration
+
+MakeHub is an OpenAI-compatible AI router specifically optimized for developers, offering access to curated latest models with customizable speed/price ratios.
+
+```bash
+# Environment setup
+export MAKEHUB_API_KEY=your_api_key_here
+
+# Basic usage
+ra-aid -m "Your task" --provider makehub --model anthropic/claude-4-sonnet
+ra-aid -m "Your task" --provider makehub --model qwen/Qwen2.5-Coder-32B
+ra-aid -m "Your task" --provider makehub --model deepseek/deepseek-V3-0324-fp8
+
+# With temperature control
+ra-aid -m "Your task" --provider makehub --model anthropic/claude-4-sonnet --temperature 0.3
+```
+
+**Why MakeHub for Developers:**
+- **Curated Latest Models**: Access to hand-picked cutting-edge models optimized for development
+- **Customizable Speed/Price**: Configure the optimal balance for your workload via `price_performance_ratio`
+- **Dev-Optimized Performance**: Intelligent routing tuned specifically for development tasks
+- **OpenAI-Compatible**: Drop-in replacement for OpenAI API calls with familiar interface
+
+**Available Models:**
+- `anthropic/claude-4-sonnet`: Latest Claude model optimized for coding tasks
+
+- `qwen/Qwen2.5-Coder-32B`: Specialized for code generation and development
+- `deepseek/deepseek-V3-0324-fp8`: High-performance reasoning model for complex problems
+- `mistral/mistral-small-24B-fp16`: Efficient model for rapid development workflows
+- `google/gemini-2.5-pro-preview`: Google's latest multimodal model with coding capabilities
+- look at 'https://makehub.ai/models' for more models
+
+
+**Configuration Options:**
+- Supports temperature control and all standard OpenAI parameters
+- Configure `price_performance_ratio` for intelligent speed/cost optimization
+- Automatic routing to optimal endpoints - no manual base URL configuration needed
+- Expert mode support with `EXPERT_MAKEHUB_API_KEY` environment variable
+
 </TabItem>
 <TabItem value="openrouter" label="OpenRouter">
 
@@ -223,6 +267,10 @@ Configure the expert model for specialized tasks; this usually benefits from a m
 export EXPERT_DEEPSEEK_API_KEY=your_key
 ra-aid -m "Your task" --expert-provider deepseek --expert-model deepseek-reasoner
 
+# MakeHub expert
+export EXPERT_MAKEHUB_API_KEY=your_key
+ra-aid -m "Your task" --expert-provider makehub --expert-model gpt-4o
+
 # OpenRouter expert
 export EXPERT_OPENROUTER_API_KEY=your_key
 ra-aid -m "Your task" --expert-provider openrouter --expert-model mistralai/mistral-large-2411
@@ -271,6 +319,7 @@ Complete list of supported environment variables:
 | `OPENROUTER_API_KEY`           | OpenRouter        | Main API access                                   |
 | `DEEPSEEK_API_KEY`             | DeepSeek          | Main API access                                   |
 | `FIREWORKS_API_KEY`            | Fireworks         | Main API access                                   |
+| `MAKEHUB_API_KEY`              | MakeHub           | Main API access                                   |
 | `OPENAI_API_KEY`               | OpenAI-compatible | API access                                        |
 | `OPENAI_API_BASE`              | OpenAI-compatible | Custom endpoint                                   |
 | `ANTHROPIC_API_KEY`            | Anthropic         | API access                                        |
@@ -284,6 +333,7 @@ Complete list of supported environment variables:
 | `EXPERT_OPENROUTER_API_KEY`    | OpenRouter        | Expert tool                                       |
 | `EXPERT_DEEPSEEK_API_KEY`      | DeepSeek          | Expert tool                                       |
 | `EXPERT_FIREWORKS_API_KEY`     | Fireworks         | Expert tool                                       |
+| `EXPERT_MAKEHUB_API_KEY`       | MakeHub           | Expert tool                                       |
 | `EXPERT_GEMINI_API_KEY`        | Gemini            | Expert tool                                       |
 | `EXPERT_OLLAMA_BASE_URL`       | Ollama            | Expert tool endpoint                              |
 | `EXPERT_AWS_PROFILE`           | Bedrock           | Expert tool                                       |
