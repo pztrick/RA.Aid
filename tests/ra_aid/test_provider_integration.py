@@ -12,6 +12,7 @@ from ra_aid.provider_strategy import (
     FireworksStrategy,
     GeminiStrategy,
     GroqStrategy,
+    MakehubStrategy,
     OpenAICompatibleStrategy,
     OpenAIStrategy,
     OpenRouterStrategy,
@@ -40,10 +41,12 @@ def clean_env():
         "ANTHROPIC_API_KEY",
         "OPENAI_API_KEY",
         "OPENROUTER_API_KEY",
+        "MAKEHUB_API_KEY",
         "OPENAI_API_BASE",
         "EXPERT_ANTHROPIC_API_KEY",
         "EXPERT_OPENAI_API_KEY",
         "EXPERT_OPENAI_API_BASE",
+        "EXPERT_MAKEHUB_API_KEY",
         "TAVILY_API_KEY",
         "ANTHROPIC_MODEL",
         "GEMINI_API_KEY",
@@ -333,6 +336,50 @@ def test_groq_validation(clean_env):
     # Valid API key
     os.environ["GROQ_API_KEY"] = "test-key"
     result = strategy.validate()
+    assert result.valid
+    assert not result.missing_vars
+
+
+def test_makehub_validation(clean_env):
+    """Test MakeHub provider validation."""
+    strategy = MakehubStrategy()
+
+    # No API key
+    result = strategy.validate()
+    assert not result.valid
+    assert "MAKEHUB_API_KEY environment variable is not set" in result.missing_vars
+
+    # Empty API key
+    os.environ["MAKEHUB_API_KEY"] = ""
+    result = strategy.validate()
+    assert not result.valid
+    assert "MAKEHUB_API_KEY environment variable is not set" in result.missing_vars
+
+    # Valid API key
+    os.environ["MAKEHUB_API_KEY"] = "test-key"
+    result = strategy.validate()
+    assert result.valid
+    assert not result.missing_vars
+
+
+def test_makehub_expert_fallback(clean_env):
+    """Test MakeHub expert mode fallback behavior."""
+    strategy = MakehubStrategy()
+    test_key = "test-expert-key"
+
+    # Set base API key but not expert key
+    os.environ["MAKEHUB_API_KEY"] = test_key
+    if "EXPERT_MAKEHUB_API_KEY" in os.environ:
+        del os.environ["EXPERT_MAKEHUB_API_KEY"]
+
+    # Create mock args with expert provider set to makehub
+    args = MockArgs(provider="makehub", expert_provider="makehub")
+
+    # Run validation
+    result = strategy.validate(args)
+
+    # Verify that EXPERT_MAKEHUB_API_KEY was set to the base key value
+    assert os.environ.get("EXPERT_MAKEHUB_API_KEY") == test_key
     assert result.valid
     assert not result.missing_vars
 

@@ -29,10 +29,12 @@ def clean_env(monkeypatch):
         "ANTHROPIC_API_KEY",
         "OPENAI_API_KEY",
         "OPENROUTER_API_KEY",
+        "MAKEHUB_API_KEY",
         "OPENAI_API_BASE",
         "EXPERT_ANTHROPIC_API_KEY",
         "EXPERT_OPENAI_API_KEY",
         "EXPERT_OPENROUTER_API_KEY",
+        "EXPERT_MAKEHUB_API_KEY",
         "EXPERT_OPENAI_API_BASE",
         "GEMINI_API_KEY",
         "EXPERT_GEMINI_API_KEY",
@@ -128,6 +130,23 @@ def test_initialize_expert_openrouter(clean_env, mock_openai, monkeypatch):
         max_retries=5,
         default_headers={"HTTP-Referer": "https://ra-aid.ai", "X-Title": "RA.Aid"},
         metadata={"model_name": "models/mistral-large", "provider": "openrouter"},
+    )
+
+
+def test_initialize_expert_makehub(clean_env, mock_openai, monkeypatch):
+    """Test expert MakeHub initialization."""
+    monkeypatch.setenv("EXPERT_MAKEHUB_API_KEY", "test-key")
+    _llm = initialize_expert_llm("makehub", "anthropic/claude-4-sonnet")
+
+    mock_openai.assert_called_once_with(
+        api_key="test-key",
+        base_url="https://api.makehub.ai/v1",
+        model="anthropic/claude-4-sonnet",
+        temperature=0,
+        timeout=180,
+        max_retries=5,
+        default_headers={"HTTP-Referer": "https://ra-aid.ai", "X-Title": "RA.Aid"},
+        metadata={"model_name": "anthropic/claude-4-sonnet", "provider": "makehub"},
     )
 
 
@@ -236,6 +255,23 @@ def test_initialize_openrouter(clean_env, mock_openai):
     )
 
 
+def test_initialize_makehub(clean_env, mock_openai):
+    """Test MakeHub provider initialization"""
+    os.environ["MAKEHUB_API_KEY"] = "test-key"
+    _model = initialize_llm("makehub", "anthropic/claude-4-sonnet", temperature=0.7)
+
+    mock_openai.assert_called_with(
+        api_key="test-key",
+        base_url="https://api.makehub.ai/v1",
+        model="anthropic/claude-4-sonnet",
+        temperature=0.7,
+        timeout=180,
+        max_retries=5,
+        default_headers={"HTTP-Referer": "https://ra-aid.ai", "X-Title": "RA.Aid"},
+        metadata={"model_name": "anthropic/claude-4-sonnet", "provider": "makehub"},
+    )
+
+
 def test_initialize_openai_compatible(clean_env, mock_openai):
     """Test OpenAI-compatible provider initialization"""
     os.environ["OPENAI_API_KEY"] = "test-key"
@@ -336,6 +372,7 @@ def test_explicit_temperature(clean_env, mock_openai, mock_anthropic, mock_gemin
     os.environ["OPENAI_API_KEY"] = "test-key"
     os.environ["ANTHROPIC_API_KEY"] = "test-key"
     os.environ["OPENROUTER_API_KEY"] = "test-key"
+    os.environ["MAKEHUB_API_KEY"] = "test-key"
     os.environ["GEMINI_API_KEY"] = "test-key"
 
     test_temp = 0.7
@@ -384,6 +421,19 @@ def test_explicit_temperature(clean_env, mock_openai, mock_anthropic, mock_gemin
         max_retries=5,
         default_headers={"HTTP-Referer": "https://ra-aid.ai", "X-Title": "RA.Aid"},
         metadata={"model_name": "test-model", "provider": "openrouter"},
+    )
+
+    # Test MakeHub
+    initialize_llm("makehub", "test-model", temperature=test_temp)
+    mock_openai.assert_called_with(
+        api_key="test-key",
+        base_url="https://api.makehub.ai/v1",
+        model="test-model",
+        temperature=test_temp,
+        timeout=180,
+        max_retries=5,
+        default_headers={"HTTP-Referer": "https://ra-aid.ai", "X-Title": "RA.Aid"},
+        metadata={"model_name": "test-model", "provider": "makehub"},
     )
 
 
@@ -537,6 +587,20 @@ def test_initialize_llm_cross_provider(
         timeout=180,
         max_retries=5,
         metadata={"model_name": "gemini-pro", "provider": "gemini"},
+    )
+
+    # Initialize MakeHub
+    monkeypatch.setenv("MAKEHUB_API_KEY", "makehub-key")
+    _llm4 = initialize_llm("makehub", "anthropic/claude-4-sonnet", temperature=0.7)
+    mock_openai.assert_called_with(
+        api_key="makehub-key",
+        base_url="https://api.makehub.ai/v1",
+        model="anthropic/claude-4-sonnet",
+        temperature=0.7,
+        timeout=180,
+        max_retries=5,
+        default_headers={"HTTP-Referer": "https://ra-aid.ai", "X-Title": "RA.Aid"},
+        metadata={"model_name": "anthropic/claude-4-sonnet", "provider": "makehub"},
     )
 
 
@@ -732,3 +796,64 @@ def test_initialize_openrouter_deepseek(
         default_headers={"HTTP-Referer": "https://ra-aid.ai", "X-Title": "RA.Aid"},
         metadata={"model_name": "deepseek/deepseek-r1", "provider": "openrouter"},
     )
+
+
+def test_makehub_price_performance_ratio(clean_env, mock_openai, monkeypatch):
+    """Test MakeHub price_performance_ratio configuration."""
+    from unittest.mock import Mock
+    
+    # Mock config repository
+    mock_config_repo = Mock()
+    mock_config_repo.get.return_value = 0.8  # Mock price_performance_ratio value
+    
+    with patch("ra_aid.llm.get_config_repository", return_value=mock_config_repo):
+        monkeypatch.setenv("MAKEHUB_API_KEY", "test-key")
+        _model = initialize_llm("makehub", "anthropic/claude-4-sonnet", temperature=0.7)
+
+        # Verify that the price-performance ratio header is included
+        expected_headers = {
+            "HTTP-Referer": "https://ra-aid.ai",
+            "X-Title": "RA.Aid",
+            "X-Price-Performance-Ratio": "0.8"
+        }
+        
+        mock_openai.assert_called_with(
+            api_key="test-key",
+            base_url="https://api.makehub.ai/v1",
+            model="anthropic/claude-4-sonnet",
+            temperature=0.7,
+            timeout=180,
+            max_retries=5,
+            default_headers=expected_headers,
+            metadata={"model_name": "anthropic/claude-4-sonnet", "provider": "makehub"},
+        )
+
+
+def test_makehub_no_price_performance_ratio(clean_env, mock_openai, monkeypatch):
+    """Test MakeHub without price_performance_ratio configuration."""
+    from unittest.mock import Mock
+    
+    # Mock config repository with no price_performance_ratio
+    mock_config_repo = Mock()
+    mock_config_repo.get.return_value = None
+    
+    with patch("ra_aid.llm.get_config_repository", return_value=mock_config_repo):
+        monkeypatch.setenv("MAKEHUB_API_KEY", "test-key")
+        _model = initialize_llm("makehub", "anthropic/claude-4-sonnet", temperature=0.7)
+
+        # Verify that no price-performance ratio header is included
+        expected_headers = {
+            "HTTP-Referer": "https://ra-aid.ai",
+            "X-Title": "RA.Aid"
+        }
+        
+        mock_openai.assert_called_with(
+            api_key="test-key",
+            base_url="https://api.makehub.ai/v1",
+            model="anthropic/claude-4-sonnet",
+            temperature=0.7,
+            timeout=180,
+            max_retries=5,
+            default_headers=expected_headers,
+            metadata={"model_name": "anthropic/claude-4-sonnet", "provider": "makehub"},
+        )
